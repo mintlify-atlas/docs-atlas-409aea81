@@ -1,0 +1,81 @@
+{
+  "projectType": "saas",
+  "projectName": "Null",
+  "projectDescription": "A modern Discord clone with real-time messaging, servers, channels, and event-driven architecture",
+  "theme": "almond",
+  "primaryColor": "#94cb04",
+  "lightColor": "#545454",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "architecture"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/authentication",
+              "features/servers",
+              "features/channels",
+              "features/messaging",
+              "features/friends"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/setup",
+              "deployment/configuration",
+              "deployment/docker"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api/authentication",
+              "api/servers",
+              "api/messages",
+              "api/friends",
+              "api/users"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "JWT-based authentication with email activation",
+    "Server and channel management",
+    "Real-time messaging with WebSockets",
+    "Friend system with request/accept workflow",
+    "Event-driven architecture with Kafka",
+    "Docker-based infrastructure"
+  ],
+  "publicApiSurface": [
+    "POST /auth/register - Register new user",
+    "POST /auth/authenticate - Login and get JWT token",
+    "GET /auth/activate-account - Activate user account",
+    "GET /servers - List user servers",
+    "POST /servers - Create new server",
+    "GET /servers/{id} - Get server details",
+    "POST /servers/{id}/channels - Create channel",
+    "GET /messages - Get messages",
+    "POST /messages - Send message",
+    "GET /friends - List friends",
+    "POST /friends/request - Send friend request",
+    "PUT /friends/accept - Accept friend request"
+  ]
+}
