@@ -1,0 +1,479 @@
+---
+title: Architecture
+description: Understanding Null's system design and components
+---
+
+## System Overview
+
+Null is built with a **microservices-inspired monorepo architecture** that separates concerns while maintaining development simplicity. The system uses event-driven patterns to enable asynchronous processing and real-time communication.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        Client Layer                          │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  Angular SPA (Port 4200)                             │   │
+│  │  - TypeScript Components                             │   │
+│  │  - WebSocket Client (SockJS + STOMP)                 │   │
+│  │  - HTTP Client (OpenAPI Generated)                   │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           │ HTTP/REST + WebSocket
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Backend Layer                           │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  Spring Boot 3 API (Port 8088)                       │   │
+│  │  /api/v1                                             │   │
+│  │  ┌────────────────────────────────────────────────┐ │   │
+│  │  │ REST Controllers                               │ │   │
+│  │  │ - AuthenticationController                     │ │   │
+│  │  │ - ServerController                             │ │   │
+│  │  │ - MessageController                            │ │   │
+│  │  │ - FriendsController                            │ │   │
+│  │  │ - UserController                               │ │   │
+│  │  └────────────────────────────────────────────────┘ │   │
+│  │  ┌────────────────────────────────────────────────┐ │   │
+│  │  │ WebSocket Endpoint                             │ │   │
+│  │  │ - STOMP /ws                                    │ │   │
+│  │  │ - Topics: /topic/chat/{conversationId}         │ │   │
+│  │  └────────────────────────────────────────────────┘ │   │
+│  │  ┌────────────────────────────────────────────────┐ │   │
+│  │  │ Kafka Integration                              │ │   │
+│  │  │ - MessageProducer: Publishes to chat-messages  │ │   │
+│  │  │ - MessageConsumer: Broadcasts to WebSocket     │ │   │
+│  │  └────────────────────────────────────────────────┘ │   │
+│  │  ┌────────────────────────────────────────────────┐ │   │
+│  │  │ Services Layer                                 │ │   │
+│  │  │ - AuthenticationService (JWT + OTP)            │ │   │
+│  │  │ - EmailService (Thymeleaf templates)           │ │   │
+│  │  │ - MessageService, ServerService, etc.          │ │   │
+│  │  └────────────────────────────────────────────────┘ │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           │ Kafka Events + Database
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Infrastructure Layer                       │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │ PostgreSQL   │  │   MongoDB    │  │    Kafka     │      │
+│  │  Port 5431   │  │  Port 27017  │  │  Port 9092   │      │
+│  │              │  │              │  │              │      │
+│  │ - Users      │  │ - Messages   │  │ Topics:      │      │
+│  │ - Tokens     │  │ - Servers    │  │ - chat-msgs  │      │
+│  │ - Roles      │  │ - Friends    │  │              │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│  ┌──────────────┐                                           │
+│  │   MailDev    │                                           │
+│  │  Port 1080   │                                           │
+│  │  SMTP: 1025  │                                           │
+│  └──────────────┘                                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Monorepo Structure
+
+The project is organized as a monorepo with clear separation of concerns:
+
+```
+null/
+├── docker-compose.yml              # Infrastructure orchestration
+├── null_services_backend/          # Spring Boot API
+│   ├── src/main/java/com/example/demo/
+│   │   ├── auth/                   # Authentication & JWT
+│   │   ├── user/                   # User management
+│   │   ├── server/                 # Server/Channel logic
+│   │   ├── message/                # Chat messages
+│   │   ├── friends/                # Friend system
+│   │   ├── email/                  # Email service
+│   │   ├── kafka/                  # Kafka producers/consumers
+│   │   ├── websocket/              # WebSocket configuration
+│   │   └── security/               # JWT & Spring Security
+│   └── src/main/resources/
+│       ├── application.yml
+│       ├── application-dev.yml     # Development config
+│       └── templates/              # Thymeleaf email templates
+└── null_services_frontend/         # Angular SPA
+    └── src/app/
+        ├── pages/                  # UI pages (login, register, etc.)
+        ├── services/               # HTTP/WebSocket services
+        └── modules/                # Feature modules
+```
+
+## Backend Architecture
+
+### REST API Layer
+
+The backend exposes a RESTful API at `/api/v1` with the following controllers:
+
+| Controller | Endpoint | Purpose |
+|------------|----------|----------|
+| `AuthenticationController` | `/api/v1/auth` | Registration, login, activation |
+| `UserController` | `/api/v1/users` | User profile management |
+| `ServerController` | `/api/v1/servers` | Server and channel CRUD |
+| `MessageController` | `/api/v1/messages` | Chat message history |
+| `FriendsController` | `/api/v1/friends` | Friend requests and management |
+| `ConversationController` | `/api/v1/conversations` | Private and group conversations |
+
+<Info>
+  API documentation is auto-generated using SpringDoc OpenAPI and available at `/api/v1/swagger-ui/index.html`.
+</Info>
+
+### Authentication Flow
+
+Null implements a secure, multi-step authentication process:
+
+<Steps>
+  <Step title="User Registration">
+    1. User submits registration form
+    2. Backend hashes password with BCrypt
+    3. Creates user with `enabled: false`
+    4. Generates 6-digit OTP token (expires in 15 minutes)
+    5. Publishes email event (future Kafka integration)
+    6. Sends activation email with Thymeleaf template
+
+    **Implementation**: `AuthenticationService.java:54-72`
+
+    ```java
+    var user = User.builder()
+        .email(request.getEmail())
+        .fullname(request.getFullname())
+        .nickName(request.getNickName())
+        .password(passwordEncoder.encode(request.getPassword()))
+        .enable(false) // Requires email activation
+        .roles(List.of(userRole))
+        .build();
+    ```
+  </Step>
+
+  <Step title="Email Verification">
+    1. User receives email at MailDev (port 1080)
+    2. Enters 6-digit OTP code
+    3. Backend validates token expiration
+    4. Sets `user.enabled = true`
+    5. Marks token as validated
+
+    **Implementation**: `AuthenticationService.java:168-189`
+
+    <Warning>
+      If the token expires, a new one is automatically generated and sent.
+    </Warning>
+  </Step>
+
+  <Step title="Login & JWT Issuance">
+    1. User submits credentials
+    2. Spring Security validates password
+    3. Backend generates JWT with custom claims:
+       - `username`: User's username
+       - `userId`: Database ID (used for WebSocket authentication)
+    4. Sets user status to `ONLINE`
+    5. Returns JWT to frontend
+
+    **Implementation**: `AuthenticationService.java:131-160`
+
+    ```java
+    var claims = new HashMap<String, Object>();
+    claims.put("username", user.getUsername());
+    claims.put("userId", user.getId());
+    
+    var jwtToken = jwtService.generateToken(claims, user);
+    ```
+  </Step>
+</Steps>
+
+### Event-Driven Architecture with Kafka
+
+Null uses **Apache Kafka** to decouple message processing and enable horizontal scaling.
+
+#### Message Flow
+
+```
+1. User sends message via WebSocket
+   │
+   ▼
+2. Backend receives message at /app/chat
+   │
+   ▼
+3. MessageProducer publishes to Kafka topic "chat-messages"
+   │  Topic: chat-messages
+   │  Key: conversationId
+   │  Value: Message object (JSON)
+   │
+   ▼
+4. MessageConsumer receives from Kafka
+   │  GroupId: null-group
+   │  Auto-offset: earliest
+   │
+   ▼
+5. Consumer broadcasts to WebSocket topic
+   │  Destination: /topic/chat/{conversationId}
+   │
+   ▼
+6. All connected clients in conversation receive message
+```
+
+**Kafka Producer** (`MessageProducer.java`):
+```java
+private static final String TOPIC = "chat-messages";
+
+public void sendMessage(Message message){
+    log.info("Sending message to Kafka: {}", message.getContent());
+    kafkaTemplate.send(TOPIC, String.valueOf(message.getConversationId()), message);
+}
+```
+
+**Kafka Consumer** (`MessageConsumer.java`):
+```java
+@KafkaListener(topics = "chat-messages", groupId = "null-group")
+public void consume(Message message) {
+    String destination = "/topic/chat/" + message.getConversationId();
+    messagingTemplate.convertAndSend(destination, message);
+}
+```
+
+<Note>
+  This architecture allows you to scale the backend horizontally by adding more consumer instances. Kafka handles load balancing automatically.
+</Note>
+
+### Database Strategy
+
+Null uses a **polyglot persistence** approach:
+
+#### PostgreSQL (Port 5431)
+Stores **relational, structured data**:
+- User accounts and authentication
+- Activation tokens
+- User roles and permissions
+
+**Configuration** (`application-dev.yml`):
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5431/null_Project
+    username: admin
+    password: admin
+  jpa:
+    hibernate:
+      ddl-auto: update
+```
+
+#### MongoDB (Port 27017)
+Stores **document-based, high-volume data**:
+- Chat messages
+- Servers and channels
+- Conversations
+- Friend relationships
+
+**Configuration** (`application-dev.yml`):
+```yaml
+spring:
+  data:
+    mongodb:
+      uri: mongodb://admin:admin@localhost:27017/null_chat?authSource=admin
+```
+
+<Info>
+  **Why two databases?**
+  - PostgreSQL provides ACID transactions for user authentication
+  - MongoDB handles high-throughput message writes without schema constraints
+</Info>
+
+## Frontend Architecture
+
+The Angular frontend is a **Single Page Application (SPA)** that communicates with the backend via:
+- **HTTP REST API** - CRUD operations
+- **WebSocket (STOMP over SockJS)** - Real-time messaging
+
+### Key Features
+
+- **Standalone Components** - Modern Angular architecture without NgModules
+- **Signal-Based Reactivity** - Angular 21 signals for reactive state
+- **OpenAPI Code Generation** - Type-safe API client from Swagger spec
+- **Responsive Design** - Bootstrap 5 + TailwindCSS
+
+### WebSocket Integration
+
+The frontend connects to the backend WebSocket at `/ws`:
+
+**Dependencies** (`package.json`):
+```json
+"@stomp/rx-stomp": "^2.3.0",
+"sockjs-client": "^1.6.1"
+```
+
+**Connection Flow**:
+1. User logs in and receives JWT
+2. Frontend extracts `userId` from JWT
+3. Establishes WebSocket connection with JWT in headers
+4. Subscribes to `/topic/chat/{conversationId}`
+5. Sends messages to `/app/chat`
+
+## Infrastructure with Docker Compose
+
+All services are orchestrated with Docker Compose for consistent development environments.
+
+### Services
+
+| Service | Image | Ports | Purpose |
+|---------|-------|-------|----------|
+| **postgres** | `postgres` | 5431:5432 | User database |
+| **pgadmin** | `dpage/pgadmin4` | 5050:80 | PostgreSQL UI |
+| **mongodb** | `mongo:latest` | 27017:27017 | Chat database |
+| **kafka** | `apache/kafka:latest` | 9092:9092 | Event streaming |
+| **mail-dev** | `maildev/maildev` | 1080:1080, 1025:1025 | Email testing |
+
+**Network**: All services communicate via the `null-network-project` bridge network.
+
+<Warning>
+  **Production Considerations**: This Docker setup is for development only. For production:
+  - Use managed databases (RDS, Atlas)
+  - Deploy Kafka cluster with replication
+  - Configure TLS/SSL for all services
+  - Use environment variables for secrets
+</Warning>
+
+## Event Flow Example: Email Notifications
+
+Let's trace how account activation emails are sent:
+
+```
+1. POST /api/v1/auth/register
+   │  AuthenticationController receives request
+   │
+   ▼
+2. AuthenticationService.register()
+   │  - Creates user (enabled: false)
+   │  - Generates 6-digit OTP token
+   │  - Saves token to PostgreSQL
+   │
+   ▼
+3. EmailService.sendEmail()
+   │  - Loads Thymeleaf template
+   │  - Injects activation code and user name
+   │  - Renders HTML email
+   │
+   ▼
+4. Spring Mail sends via SMTP
+   │  Host: localhost:1025 (MailDev)
+   │
+   ▼
+5. MailDev receives and displays email
+   │  Web UI: http://localhost:1080
+   │
+   ▼
+6. User retrieves OTP code
+   │
+   ▼
+7. POST /api/v1/auth/activate-account?token=123456
+   │  - Validates token
+   │  - Sets user.enabled = true
+   │  - Marks token as validated
+```
+
+**Future Enhancement**: Email sending will be moved to Kafka for asynchronous processing.
+
+## Security Architecture
+
+### JWT Token Structure
+
+**Header**:
+```json
+{
+  "alg": "HS256",
+  "typ": "JWT"
+}
+```
+
+**Payload**:
+```json
+{
+  "sub": "user@example.com",
+  "username": "johndoe",
+  "userId": "507f1f77bcf86cd799439011",
+  "iat": 1709595600,
+  "exp": 1709682000
+}
+```
+
+**Configuration** (`application-dev.yml`):
+```yaml
+application:
+  security:
+    jwt:
+      secret-key: 038fa2ffaaed1d2613c42f3ed23fb661cd77e0ac8eec0b14
+      expiration: 8640000 # 100 days in milliseconds
+```
+
+<Warning>
+  **Production**: Use environment variables for the secret key and reduce expiration time.
+</Warning>
+
+### Spring Security Filter Chain
+
+The backend uses a custom JWT authentication filter:
+
+1. Extract JWT from `Authorization: Bearer <token>` header
+2. Validate token signature and expiration
+3. Extract user details from token claims
+4. Load user from database via `UserDetailsService`
+5. Set authentication in `SecurityContextHolder`
+
+**Implementation**: `SecurityConfig.java` and `JwtService.java`
+
+## Performance Considerations
+
+### Scalability
+
+- **Stateless Backend**: JWT enables horizontal scaling without session affinity
+- **Kafka Partitioning**: Messages partitioned by `conversationId` for parallel processing
+- **Connection Pooling**: HikariCP for PostgreSQL, MongoDB connection pooling
+- **WebSocket**: STOMP allows pub/sub pattern for efficient message distribution
+
+### Optimization Opportunities
+
+<CardGroup cols={2}>
+  <Card title="Caching" icon="database">
+    Add Redis for:
+    - User session data
+    - Frequently accessed servers/channels
+    - Online user status
+  </Card>
+  
+  <Card title="CDN" icon="cloud">
+    Serve static assets via CDN:
+    - Angular build artifacts
+    - User avatars
+    - Embedded images
+  </Card>
+  
+  <Card title="Database Indexing" icon="magnifying-glass">
+    Create indexes on:
+    - `messages.conversationId`
+    - `users.email`
+    - `tokens.token`
+  </Card>
+  
+  <Card title="Message Queuing" icon="list">
+    Use Kafka for:
+    - Async email sending
+    - Push notifications
+    - Analytics events
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="API Reference" icon="code" href="/api/authentication">
+    Explore REST endpoints
+  </Card>
+  
+  <Card title="Real-time Messaging" icon="plug" href="/features/messaging">
+    Real-time messaging setup
+  </Card>
+  
+  <Card title="Deployment" icon="rocket" href="/deployment/setup">
+    Production deployment guide
+  </Card>
+</CardGroup>

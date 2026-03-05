@@ -1,0 +1,221 @@
+---
+title: Deployment Setup
+description: Complete guide to setting up Null for deployment
+---
+
+## Prerequisites
+
+Before deploying Null, ensure you have the following software installed on your system:
+
+### Required Software
+
+- **Java 17 or higher** - Required for running the Spring Boot backend
+- **Node.js 18+** - Required for the Angular frontend
+- **Docker & Docker Compose** - Required for running infrastructure services
+- **Maven 3.6+** - For building the backend application
+- **npm 11.6.2+** - For managing frontend dependencies
+
+### Verify Prerequisites
+
+Run these commands to verify your installations:
+
+```bash
+java -version  # Should show Java 17 or higher
+node -v        # Should show Node.js 18+
+npm -v         # Should show npm 11.6.2+
+docker --version
+docker-compose --version
+mvn -v
+```
+
+## Setup Steps
+
+<Steps>
+  <Step title="Clone the Repository">
+    Clone the Null project repository to your local machine:
+
+    ```bash
+    git clone <repository-url>
+    cd null
+    ```
+  </Step>
+
+  <Step title="Start Infrastructure Services">
+    Start all required infrastructure services using Docker Compose:
+
+    ```bash
+    docker-compose up -d
+    ```
+
+    This will start:
+    - PostgreSQL database (port 5431)
+    - MongoDB (port 27017)
+    - Apache Kafka (port 9092)
+    - PgAdmin (port 5050)
+    - MailDev (ports 1080, 1025)
+
+    Verify all services are running:
+
+    ```bash
+    docker-compose ps
+    ```
+  </Step>
+
+  <Step title="Configure Backend">
+    The backend configuration is located in `null_services_backend/src/main/resources/`:
+
+    - `application.yml` - Main configuration
+    - `application-dev.yml` - Development profile settings
+
+    The default configuration uses the `dev` profile. Verify the settings match your environment:
+
+    ```yaml
+    spring:
+      profiles:
+        active: dev
+    ```
+
+    <Warning>
+      For production deployments, create an `application-prod.yml` file with production-specific settings and change the active profile to `prod`.
+    </Warning>
+  </Step>
+
+  <Step title="Initialize the Database">
+    The application uses Hibernate's `ddl-auto: update` setting, which automatically creates and updates database tables on startup.
+
+    PostgreSQL connection details:
+    - **Host:** localhost
+    - **Port:** 5431
+    - **Database:** null_Project
+    - **Username:** admin
+    - **Password:** admin
+
+    You can access PgAdmin to verify the database:
+    1. Open http://localhost:5050
+    2. Login with `pgadmin@pgadmin.org` / `admin`
+    3. Add server with host `postgres-sql-null`, port `5432`, credentials `admin/admin`
+  </Step>
+
+  <Step title="Build the Backend">
+    Navigate to the backend directory and build the application:
+
+    ```bash
+    cd null_services_backend
+    mvn clean install
+    ```
+
+    This will:
+    - Download all dependencies
+    - Compile the Java code
+    - Run tests
+    - Package the application as a JAR file
+  </Step>
+
+  <Step title="Start the Backend">
+    Run the Spring Boot application:
+
+    ```bash
+    mvn spring-boot:run
+    ```
+
+    Or run the JAR directly:
+
+    ```bash
+    java -jar target/null-0.0.1-SNAPSHOT.jar
+    ```
+
+    The backend will start on **port 8088** with the context path `/api/v1`.
+
+    Verify the backend is running:
+    - API: http://localhost:8088/api/v1
+    - Swagger UI: http://localhost:8088/api/v1/swagger-ui.html
+  </Step>
+
+  <Step title="Install Frontend Dependencies">
+    Navigate to the frontend directory and install dependencies:
+
+    ```bash
+    cd ../null_services_frontend
+    npm install
+    ```
+  </Step>
+
+  <Step title="Start the Frontend">
+    Start the Angular development server:
+
+    ```bash
+    npm start
+    ```
+
+    The frontend will be available at **http://localhost:4200**.
+  </Step>
+
+  <Step title="Verify the Setup">
+    Test the complete setup:
+
+    1. **Frontend:** Open http://localhost:4200
+    2. **Backend API:** http://localhost:8088/api/v1
+    3. **Swagger Documentation:** http://localhost:8088/api/v1/swagger-ui.html
+    4. **PgAdmin:** http://localhost:5050
+    5. **MailDev:** http://localhost:1080 (email testing interface)
+
+    All services should be accessible and functional.
+  </Step>
+</Steps>
+
+## Initial Configuration
+
+### JWT Secret Key
+
+The application includes a default JWT secret key in `application-dev.yml`:
+
+```yaml
+application:
+  security:
+    jwt:
+      secret-key: 038fa2ffaaed1d2613c42f3ed23fb661cd77e0ac8eec0b14
+      expiration: 8640000
+```
+
+<Warning>
+  **Security Alert:** Change the JWT secret key before deploying to production. Generate a secure random key and store it as an environment variable.
+</Warning>
+
+### Email Configuration
+
+The application is configured to use MailDev for email testing:
+
+```yaml
+spring:
+  mail:
+    host: localhost
+    port: 1025
+```
+
+Activation emails will use this URL:
+```yaml
+application:
+  mailing:
+    frontend:
+      activation-url: http://localhost:4200/activate-account
+```
+
+### CORS Configuration
+
+The frontend origin is configured in `application-dev.yml`:
+
+```yaml
+application:
+  cors:
+    allowed-origins: htpp://localhost:4200
+```
+
+<Warning>
+  Note: There's a typo in the default configuration (`htpp` instead of `http`). Update this to `http://localhost:4200` or add your production domain.
+</Warning>
+
+## Next Steps
+
+- Review the [Configuration Reference](/deployment/configuration) for detailed settings
+- Learn about [Docker Deployment](/deployment/docker) for production setup
+- Configure environment-specific settings for your deployment environment

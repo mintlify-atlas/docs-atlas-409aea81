@@ -1,0 +1,498 @@
+---
+title: Configuration Reference
+description: Complete configuration reference for Null backend and frontend
+---
+
+## Backend Configuration
+
+The backend uses Spring Boot's YAML-based configuration system. Configuration files are located in `null_services_backend/src/main/resources/`.
+
+### Configuration Files
+
+- **`application.yml`** - Base configuration and profile selection
+- **`application-dev.yml`** - Development environment settings
+- **`application-prod.yml`** - Production environment settings (create this file)
+
+### Profile Selection
+
+Set the active profile in `application.yml`:
+
+```yaml
+spring:
+  profiles:
+    active: dev  # Change to 'prod' for production
+```
+
+## Database Configuration
+
+### PostgreSQL (Primary Database)
+
+Used for user data, application state, and relational data.
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5431/null_Project
+    username: admin
+    password: admin
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update  # Use 'validate' in production
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+    database: postgresql
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+```
+
+#### Configuration Options
+
+| Property | Description | Development | Production |
+|----------|-------------|-------------|------------|
+| `url` | JDBC connection URL | `localhost:5431` | Your DB host |
+| `username` | Database username | `admin` | Secure username |
+| `password` | Database password | `admin` | Strong password |
+| `ddl-auto` | Schema management | `update` | `validate` |
+| `show-sql` | Log SQL queries | `true` | `false` |
+
+<Warning>
+  **Production Warning:** Always set `ddl-auto: validate` in production to prevent automatic schema changes. Use migration tools like Flyway or Liquibase for schema management.
+</Warning>
+
+### MongoDB (Chat Data)
+
+Used for chat messages and real-time communication data.
+
+```yaml
+spring:
+  data:
+    mongodb:
+      uri: mongodb://admin:admin@localhost:27017/null_chat?authSource=admin
+```
+
+#### MongoDB URI Format
+
+```
+mongodb://[username]:[password]@[host]:[port]/[database]?authSource=[authDb]
+```
+
+<CodeGroup>
+```yaml Development
+spring:
+  data:
+    mongodb:
+      uri: mongodb://admin:admin@localhost:27017/null_chat?authSource=admin
+```
+
+```yaml Production
+spring:
+  data:
+    mongodb:
+      uri: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo-host:27017/null_chat?authSource=admin
+```
+</CodeGroup>
+
+## Kafka Configuration
+
+Apache Kafka is used for event streaming and asynchronous messaging.
+
+```yaml
+spring:
+  kafka:
+    bootstrap-server: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    
+    consumer:
+      group-id: null-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.example.demo.message"
+```
+
+### Kafka Properties
+
+| Property | Description | Value |
+|----------|-------------|-------|
+| `bootstrap-server` | Kafka broker address | `localhost:9092` |
+| `group-id` | Consumer group identifier | `null-group` |
+| `auto-offset-reset` | Offset reset strategy | `earliest` |
+| `trusted.packages` | Trusted deserialization packages | `com.example.demo.message` |
+
+## Email Configuration
+
+### SMTP Settings
+
+Configured to use MailDev for local development:
+
+```yaml
+spring:
+  mail:
+    host: localhost
+    port: 1025
+```
+
+<CodeGroup>
+```yaml Development (MailDev)
+spring:
+  mail:
+    host: localhost
+    port: 1025
+```
+
+```yaml Production (Gmail)
+spring:
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${EMAIL_USERNAME}
+    password: ${EMAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+```
+
+```yaml Production (SendGrid)
+spring:
+  mail:
+    host: smtp.sendgrid.net
+    port: 587
+    username: apikey
+    password: ${SENDGRID_API_KEY}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+```
+</CodeGroup>
+
+### Mailing Configuration
+
+```yaml
+application:
+  mailing:
+    frontend:
+      activation-url: http://localhost:4200/activate-account
+```
+
+This URL is used in activation emails sent to new users.
+
+## Security Configuration
+
+### JWT Settings
+
+```yaml
+application:
+  security:
+    jwt:
+      secret-key: 038fa2ffaaed1d2613c42f3ed23fb661cd77e0ac8eec0b14
+      expiration: 8640000  # ~100 days in milliseconds
+```
+
+<Warning>
+  **Critical Security Warning:** The default secret key MUST be changed in production. Generate a secure random key:
+  
+  ```bash
+  # Generate a secure secret key
+  openssl rand -hex 32
+  ```
+  
+  Store the key as an environment variable and reference it:
+  ```yaml
+  application:
+    security:
+      jwt:
+        secret-key: ${JWT_SECRET_KEY}
+  ```
+</Warning>
+
+### JWT Properties
+
+| Property | Description | Default | Recommendation |
+|----------|-------------|---------|----------------|
+| `secret-key` | Signing key for JWT tokens | Default value | Use environment variable |
+| `expiration` | Token validity period (ms) | 8640000 (~100 days) | 3600000 (1 hour) for production |
+
+## CORS Configuration
+
+```yaml
+application:
+  cors:
+    allowed-origins: htpp://localhost:4200
+```
+
+<Warning>
+  **Configuration Error:** There's a typo in the default configuration (`htpp` instead of `http`). Update this value:
+  
+  ```yaml
+  application:
+    cors:
+      allowed-origins: http://localhost:4200
+  ```
+  
+  For production, add your production domain:
+  ```yaml
+  application:
+    cors:
+      allowed-origins: https://yourdomain.com,http://localhost:4200
+  ```
+</Warning>
+
+## Server Configuration
+
+### Port and Context Path
+
+```yaml
+server:
+  port: 8088
+  servlet:
+    context-path: /api/v1
+```
+
+The backend API will be accessible at: `http://localhost:8088/api/v1`
+
+### File Upload Configuration
+
+```yaml
+spring:
+  servlet:
+    multipart:
+      max-file-size: 50MB
+```
+
+Limits file uploads to 50MB. Adjust this value based on your requirements.
+
+## Logging Configuration
+
+```yaml
+logging:
+  level:
+    org.springframework.web.socket: DEBUG
+    org.springframework.messaging: DEBUG
+    org.springframework.security: DEBUG
+```
+
+<CodeGroup>
+```yaml Development
+logging:
+  level:
+    org.springframework.web.socket: DEBUG
+    org.springframework.messaging: DEBUG
+    org.springframework.security: DEBUG
+```
+
+```yaml Production
+logging:
+  level:
+    root: INFO
+    com.fer.null: INFO
+    org.springframework.web.socket: WARN
+    org.springframework.messaging: WARN
+    org.springframework.security: WARN
+  file:
+    name: /var/log/null-app/application.log
+    max-size: 100MB
+    max-history: 30
+```
+</CodeGroup>
+
+## API Documentation
+
+Springdoc OpenAPI configuration:
+
+```yaml
+springdoc:
+  default-produces-media-type: application/json
+```
+
+Swagger UI is available at: `http://localhost:8088/api/v1/swagger-ui.html`
+
+## Environment Variables
+
+For production deployments, use environment variables for sensitive configuration:
+
+### Recommended Environment Variables
+
+```bash
+# Database
+DB_HOST=your-postgres-host
+DB_PORT=5432
+DB_NAME=null_Project
+DB_USERNAME=your-db-user
+DB_PASSWORD=your-secure-password
+
+# MongoDB
+MONGO_HOST=your-mongo-host
+MONGO_PORT=27017
+MONGO_USERNAME=your-mongo-user
+MONGO_PASSWORD=your-mongo-password
+MONGO_DATABASE=null_chat
+
+# Kafka
+KAFKA_BOOTSTRAP_SERVERS=your-kafka-host:9092
+
+# Security
+JWT_SECRET_KEY=your-generated-secret-key
+JWT_EXPIRATION=3600000
+
+# Email
+EMAIL_HOST=smtp.yourdomain.com
+EMAIL_PORT=587
+EMAIL_USERNAME=your-email@domain.com
+EMAIL_PASSWORD=your-email-password
+
+# Application
+FRONTEND_URL=https://yourdomain.com
+ACTIVATION_URL=https://yourdomain.com/activate-account
+```
+
+### Using Environment Variables in Configuration
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5431}/${DB_NAME:null_Project}
+    username: ${DB_USERNAME:admin}
+    password: ${DB_PASSWORD:admin}
+  
+  data:
+    mongodb:
+      uri: mongodb://${MONGO_USERNAME:admin}:${MONGO_PASSWORD:admin}@${MONGO_HOST:localhost}:${MONGO_PORT:27017}/${MONGO_DATABASE:null_chat}?authSource=admin
+  
+  kafka:
+    bootstrap-server: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+application:
+  security:
+    jwt:
+      secret-key: ${JWT_SECRET_KEY:038fa2ffaaed1d2613c42f3ed23fb661cd77e0ac8eec0b14}
+      expiration: ${JWT_EXPIRATION:8640000}
+  mailing:
+    frontend:
+      activation-url: ${ACTIVATION_URL:http://localhost:4200/activate-account}
+  cors:
+    allowed-origins: ${ALLOWED_ORIGINS:http://localhost:4200}
+```
+
+## Frontend Configuration
+
+The frontend is built with Angular 21. Configuration is managed through:
+
+- `package.json` - Dependencies and scripts
+- Build-time environment files (if created)
+
+### Frontend Scripts
+
+```json
+{
+  "scripts": {
+    "start": "ng serve",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "generate-api": "openapi-generator-cli generate -i http://localhost:8088/api/v1/v3/api-docs -g typescript-angular -o src/app/services/api"
+  }
+}
+```
+
+### API Code Generation
+
+The frontend uses OpenAPI Generator to generate TypeScript API clients from the backend:
+
+```bash
+npm run generate-api
+```
+
+This command:
+1. Fetches the OpenAPI spec from `http://localhost:8088/api/v1/v3/api-docs`
+2. Generates TypeScript Angular services
+3. Outputs to `src/app/services/api`
+
+<Warning>
+  Ensure the backend is running on port 8088 before generating API clients.
+</Warning>
+
+## Complete Configuration Example
+
+Here's a complete `application-prod.yml` example for production:
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+    database: postgresql
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+  
+  data:
+    mongodb:
+      uri: mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOST}:${MONGO_PORT}/${MONGO_DATABASE}?authSource=admin
+  
+  mail:
+    host: ${EMAIL_HOST}
+    port: ${EMAIL_PORT}
+    username: ${EMAIL_USERNAME}
+    password: ${EMAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+  
+  kafka:
+    bootstrap-server: ${KAFKA_BOOTSTRAP_SERVERS}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: null-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.example.demo.message"
+
+application:
+  security:
+    jwt:
+      secret-key: ${JWT_SECRET_KEY}
+      expiration: ${JWT_EXPIRATION:3600000}
+  mailing:
+    frontend:
+      activation-url: ${ACTIVATION_URL}
+  cors:
+    allowed-origins: ${ALLOWED_ORIGINS}
+
+logging:
+  level:
+    root: INFO
+    com.fer.null: INFO
+    org.springframework.web.socket: WARN
+    org.springframework.messaging: WARN
+    org.springframework.security: WARN
+  file:
+    name: /var/log/null-app/application.log
+
+server:
+  port: ${SERVER_PORT:8088}
+```

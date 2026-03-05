@@ -1,0 +1,195 @@
+---
+title: Friends
+description: Endpoints for managing friend requests and friend lists
+---
+
+The Friends API handles friend request management, including sending, accepting, and listing friends and pending requests.
+
+## Send Friend Request
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.example.com/friends/request/789 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{
+  "message": "Friend request has been sent"
+}
+```
+</ResponseExample>
+
+Sends a friend request to another user.
+
+<ParamField path="targetUserId" type="integer" required>
+  The ID of the user to send the friend request to.
+</ParamField>
+
+### Response
+
+<ResponseField name="message" type="string">
+  Confirmation message indicating the friend request was sent.
+</ResponseField>
+
+### Errors
+
+<ResponseField name="404" type="Not Found">
+  Target user not found.
+</ResponseField>
+
+<ResponseField name="400" type="Bad Request">
+  - Cannot send friend request to yourself
+  - Friend request already exists
+  - Users are already friends
+</ResponseField>
+
+---
+
+## Accept Friend Request
+
+<RequestExample>
+```bash cURL
+curl -X PATCH https://api.example.com/friends/accept/123 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{
+  "message": "Friend request has been accepted"
+}
+```
+</ResponseExample>
+
+Accepts a pending friend request.
+
+<ParamField path="friendshipId" type="integer" required>
+  The ID of the friendship record to accept.
+</ParamField>
+
+### Response
+
+<ResponseField name="message" type="string">
+  Confirmation message indicating the friend request was accepted.
+</ResponseField>
+
+### Errors
+
+<ResponseField name="404" type="Not Found">
+  Friend request not found.
+</ResponseField>
+
+<ResponseField name="403" type="Forbidden">
+  User is not the recipient of this friend request.
+</ResponseField>
+
+<ResponseField name="400" type="Bad Request">
+  Friend request has already been accepted or rejected.
+</ResponseField>
+
+---
+
+## Get My Friends
+
+<RequestExample>
+```bash cURL
+curl -X GET https://api.example.com/friends \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+[
+  {
+    "id": 789,
+    "name": "janedoe",
+    "status": "ONLINE"
+  },
+  {
+    "id": 456,
+    "name": "bobsmith",
+    "status": "AWAY"
+  },
+  {
+    "id": 321,
+    "name": "alicejones",
+    "status": "OFFLINE"
+  }
+]
+```
+</ResponseExample>
+
+Retrieves the authenticated user's friend list.
+
+### Response
+
+Returns an array of friend objects.
+
+<ResponseField name="id" type="integer">
+  Friend's user ID.
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Friend's display name (nickname).
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Friend's current presence status. Possible values: `ONLINE`, `OFFLINE`, `AWAY`, `DO_NOT_DISTURB`.
+</ResponseField>
+
+---
+
+## Get Pending Friend Requests
+
+<RequestExample>
+```bash cURL
+curl -X GET https://api.example.com/friends/pending \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+[
+  {
+    "friendshipId": 123,
+    "requesterId": 789,
+    "requesterNickname": "janedoe",
+    "createdAt": "2026-03-05T10:30:00"
+  },
+  {
+    "friendshipId": 124,
+    "requesterId": 456,
+    "requesterNickname": "bobsmith",
+    "createdAt": "2026-03-05T11:15:00"
+  }
+]
+```
+</ResponseExample>
+
+Retrieves pending friend requests received by the authenticated user.
+
+### Response
+
+Returns an array of pending friend request objects.
+
+<ResponseField name="friendshipId" type="integer">
+  Unique identifier for the friendship record. Use this ID to accept or reject the request.
+</ResponseField>
+
+<ResponseField name="requesterId" type="integer">
+  User ID of the person who sent the friend request.
+</ResponseField>
+
+<ResponseField name="requesterNickname" type="string">
+  Display name of the person who sent the request.
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  Timestamp when the friend request was created, in ISO 8601 format.
+</ResponseField>

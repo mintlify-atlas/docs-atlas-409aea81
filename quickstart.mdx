@@ -1,80 +1,268 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get Null running locally in under 10 minutes
 ---
 
-## Get started in three steps
+## Prerequisites
 
-Get your documentation site running locally and make your first customization.
+Before you begin, ensure you have the following installed:
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+- **Java 17 or higher** - [Download](https://adoptium.net/)
+- **Node.js 18 or higher** - [Download](https://nodejs.org/)
+- **Docker & Docker Compose** - [Download](https://www.docker.com/)
+- **Git** - [Download](https://git-scm.com/)
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  Maven is included in the project via the Maven Wrapper (`./mvnw`), so you don't need to install it separately.
 </Note>
+
+## Installation
+
+<Steps>
+  <Step title="Clone the Repository">
+    Clone the Null repository to your local machine:
+
+    ```bash
+    git clone https://github.com/yourusername/null.git
+    cd null
+    ```
+
+    The project follows a monorepo structure:
+    - `null_services_backend/` - Spring Boot API
+    - `null_services_frontend/` - Angular SPA
+    - `docker-compose.yml` - Infrastructure orchestration
+  </Step>
+
+  <Step title="Start the Infrastructure">
+    Launch all required services using Docker Compose:
+
+    ```bash
+    docker-compose up -d
+    ```
+
+    This starts:
+    - **PostgreSQL** on port `5431` - User authentication database
+    - **MongoDB** on port `27017` - Chat messages database
+    - **Kafka** on port `9092` - Event streaming broker
+    - **MailDev** on port `1080` (web) and `1025` (SMTP) - Email testing server
+    - **PgAdmin** on port `5050` - PostgreSQL management UI
+
+    <Info>
+      Wait 30-60 seconds for Kafka to fully initialize before starting the backend.
+    </Info>
+
+    Verify all containers are running:
+
+    ```bash
+    docker-compose ps
+    ```
+
+    You should see all services in the "Up" state.
+  </Step>
+
+  <Step title="Start the Backend">
+    Navigate to the backend directory and run the Spring Boot application:
+
+    ```bash
+    cd null_services_backend
+    ./mvnw spring-boot:run
+    ```
+
+    The backend API will start on `http://localhost:8088/api/v1`.
+
+    <Info>
+      On first run, Maven will download all dependencies. This may take a few minutes.
+    </Info>
+
+    Look for this log message to confirm successful startup:
+
+    ```
+    Started NullApplication in X.XXX seconds
+    ```
+
+    The API documentation (Swagger UI) is available at:
+    ```
+    http://localhost:8088/api/v1/swagger-ui/index.html
+    ```
+  </Step>
+
+  <Step title="Start the Frontend">
+    Open a new terminal, navigate to the frontend directory, and install dependencies:
+
+    ```bash
+    cd null_services_frontend
+    npm install
+    ```
+
+    Start the Angular development server:
+
+    ```bash
+    npm start
+    ```
+
+    The frontend will be available at `http://localhost:4200`.
+
+    <Info>
+      The Angular CLI will automatically open your browser. If not, navigate to `http://localhost:4200` manually.
+    </Info>
+  </Step>
+
+  <Step title="Register Your First User">
+    Open your browser and navigate to `http://localhost:4200`.
+
+    1. Click **Register** to create a new account
+    2. Fill in the registration form:
+       - Email address
+       - Full name
+       - Nickname
+       - Password
+       - Date of birth
+    3. Click **Submit**
+
+    The backend will:
+    - Hash your password using BCrypt
+    - Save your account with `enabled: false`
+    - Generate a 6-digit OTP (One-Time Password)
+    - Send an activation email via Kafka to the email service
+
+    <Note>
+      Users cannot log in until they activate their account via email.
+    </Note>
+  </Step>
+
+  <Step title="Activate Your Account">
+    Open MailDev to view the activation email:
+
+    ```
+    http://localhost:1080
+    ```
+
+    You'll see an email with the subject "Account Activation".
+
+    1. Open the email and copy the **6-digit activation code**
+    2. Return to the Null frontend
+    3. Navigate to the **Activate Account** page
+    4. Enter your activation code
+    5. Click **Activate**
+
+    <Warning>
+      Activation codes expire after **15 minutes**. If expired, a new code will be automatically sent to your email.
+    </Warning>
+
+    Your account is now activated and you can log in!
+  </Step>
+
+  <Step title="Log In and Explore">
+    Return to `http://localhost:4200` and log in with your credentials.
+
+    Upon successful login:
+    - The backend issues a **JWT token** containing your user ID and username
+    - Your status is set to **ONLINE**
+    - The token is stored in the frontend for API requests
+
+    You can now:
+    - Create or join servers
+    - Create channels within servers
+    - Send real-time messages via WebSocket
+    - Add friends and view their status
+  </Step>
+</Steps>
+
+## Verifying the Installation
+
+### Check the Backend
+
+Test the backend health by calling the API:
+
+```bash
+curl http://localhost:8088/api/v1/
+```
+
+### Check Database Connections
+
+**PostgreSQL** (via PgAdmin):
+```
+http://localhost:5050
+```
+Login with:
+- Email: `pgadmin@pgadmin.org`
+- Password: `admin`
+
+**MongoDB**:
+```bash
+docker exec -it null_mongodb mongosh -u admin -p admin
+```
+
+### Check Kafka Topics
+
+```bash
+docker exec -it null_kafka kafka-topics --list --bootstrap-server localhost:9092
+```
+
+You should see the `chat-messages` topic.
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Backend fails to start: 'Connection refused' to PostgreSQL">
+    **Solution**: Ensure Docker Compose is running and PostgreSQL is healthy.
+
+    ```bash
+    docker-compose ps
+    docker-compose logs postgres
+    ```
+
+    If PostgreSQL isn't running, restart it:
+    ```bash
+    docker-compose restart postgres
+    ```
+  </Accordion>
+
+  <Accordion title="Kafka 'broker not available' errors">
+    **Solution**: Kafka takes 30-60 seconds to fully start. Wait and try again.
+
+    Check Kafka logs:
+    ```bash
+    docker-compose logs kafka
+    ```
+
+    Look for the message: `[KafkaServer id=1] started`
+  </Accordion>
+
+  <Accordion title="Frontend can't connect to backend">
+    **Solution**: Verify the backend is running on port 8088.
+
+    Check CORS configuration in `/null_services_backend/src/main/resources/application-dev.yml`:
+    ```yaml
+    application:
+      cors:
+        allowed-origins: http://localhost:4200
+    ```
+  </Accordion>
+
+  <Accordion title="Activation email not received">
+    **Solution**: Check MailDev is running and the backend can connect to it.
+
+    1. Open MailDev web UI: `http://localhost:1080`
+    2. Check backend logs for email sending errors
+    3. Verify SMTP configuration in `application-dev.yml`:
+       ```yaml
+       spring:
+         mail:
+           host: localhost
+           port: 1025
+       ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture Overview" icon="diagram-project" href="/architecture">
+    Learn how Null's components work together
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api/authentication">
+    Explore the REST API endpoints
+  </Card>
+</CardGroup>

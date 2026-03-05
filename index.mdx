@@ -1,97 +1,214 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Welcome to Null"
+description: "A modern real-time communication platform built with event-driven architecture"
+mode: "custom"
 ---
 
-## Setting up
+<div className="relative overflow-hidden bg-gradient-to-br from-[#94cb04] via-[#7aa303] to-[#608802] dark:from-[#608802] dark:via-[#4a6902] dark:to-[#344a01] py-20">
+  <div className="max-w-6xl mx-auto px-6 lg:px-8">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+      <div className="lg:col-span-7">
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6">
+          Build Modern Communication Experiences
+        </h1>
+        <p className="text-lg sm:text-xl text-white/90 mb-8 max-w-2xl">
+          Null is a Discord-inspired platform featuring real-time messaging, server management, and event-driven architecture. Perfect for building scalable chat applications.
+        </p>
+        <div className="flex flex-wrap gap-4">
+          <a 
+            href="/quickstart" 
+            className="inline-flex items-center px-6 py-3 bg-white text-[#608802] font-semibold rounded-lg hover:bg-gray-100 transition-colors no-underline"
+          >
+            Get Started
+            <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </a>
+          <a 
+            href="/api/authentication" 
+            className="inline-flex items-center px-6 py-3 border-2 border-white/30 bg-white/10 text-white font-semibold rounded-lg hover:bg-white/20 transition-colors no-underline backdrop-blur-sm"
+          >
+            API Reference
+          </a>
+        </div>
+      </div>
+      <div className="lg:col-span-5 hidden lg:block">
+        <div className="relative">
+          <div className="absolute inset-0 bg-white/10 rounded-2xl blur-3xl"></div>
+          <img 
+            src="/logo.png" 
+            alt="Null Platform" 
+            className="relative w-full h-auto max-w-md mx-auto drop-shadow-2xl"
+            noZoom
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+      Quick Start
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+      Get your Null instance running in minutes with Docker Compose
+    </p>
+  </div>
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+  <Steps>
+    <Step title="Clone the repository">
+      Start by cloning the Null repository to your local machine.
+      
+      ```bash
+      git clone https://github.com/Fernand-O-band01/null.git
+      cd null
+      ```
+    </Step>
+    
+    <Step title="Start the infrastructure">
+      Launch MongoDB, Kafka, PostgreSQL, and MailDev using Docker Compose.
+      
+      ```bash
+      docker-compose up -d
+      ```
+      
+      <Info>This will start all required services: MongoDB (port 27017), Kafka (port 9092), PostgreSQL (port 5431), PgAdmin (port 5050), and MailDev (port 1080).</Info>
+    </Step>
+    
+    <Step title="Start the backend">
+      Navigate to the backend directory and run the Spring Boot application.
+      
+      ```bash
+      cd null_services_backend
+      ./mvnw spring-boot:run
+      ```
+      
+      The API will be available at `http://localhost:8088`
+    </Step>
+    
+    <Step title="Start the frontend">
+      In a new terminal, navigate to the frontend directory and start the Angular app.
+      
+      ```bash
+      cd null_services_frontend
+      npm install
+      npm start
+      ```
+      
+      Open your browser to `http://localhost:4200` to access the application.
+    </Step>
+  </Steps>
+</div>
 
-## Make it yours
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+      Core Features
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+      Everything you need to build a modern communication platform
+    </p>
+  </div>
 
-Design a docs site that looks great and empowers your users.
+  <CardGroup cols={2}>
+    <Card title="Authentication & Security" icon="shield-halved" href="/features/authentication">
+      JWT-based authentication with email verification using OTP codes sent via email.
+    </Card>
+    <Card title="Servers & Channels" icon="server" href="/features/servers">
+      Create and manage servers with multiple channels for organized conversations.
+    </Card>
+    <Card title="Real-time Messaging" icon="message" href="/features/messaging">
+      WebSocket-powered instant messaging with STOMP protocol for real-time delivery.
+    </Card>
+    <Card title="Friend System" icon="users" href="/features/friends">
+      Send, accept, and manage friend requests to build your network.
+    </Card>
+    <Card title="Event-Driven Architecture" icon="bolt" href="/architecture">
+      Apache Kafka for asynchronous event processing and microservices communication.
+    </Card>
+    <Card title="Docker Infrastructure" icon="docker" href="/deployment/docker">
+      Complete containerized setup with MongoDB, PostgreSQL, and Kafka.
+    </Card>
+  </CardGroup>
+</div>
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+      Explore the Platform
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+      Deep dive into features and API capabilities
+    </p>
+  </div>
 
-## Create beautiful pages
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <a 
+      href="/architecture" 
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#94cb04] dark:hover:border-[#94cb04] overflow-hidden transition-colors no-underline bg-white dark:bg-[#1a1d27]"
+    >
+      <div className="h-56 bg-gradient-to-br from-[#94cb04]/10 to-[#608802]/5 dark:from-[#94cb04]/20 dark:to-[#608802]/10 flex items-center justify-center overflow-hidden">
+        <svg className="w-24 h-24 text-[#94cb04]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        </svg>
+      </div>
+      <div className="p-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">System Architecture</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Learn how Null's event-driven architecture enables scalable real-time communication.
+        </p>
+        <div className="flex items-center text-sm font-medium text-[#94cb04] group-hover:text-[#7aa303]">
+          Explore architecture
+          <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
 
-Everything you need to create world-class documentation.
+    <a 
+      href="/api/authentication" 
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#94cb04] dark:hover:border-[#94cb04] overflow-hidden transition-colors no-underline bg-white dark:bg-[#1a1d27]"
+    >
+      <div className="h-56 bg-gradient-to-br from-[#545454]/10 to-[#94cb04]/5 dark:from-[#545454]/20 dark:to-[#94cb04]/10 flex items-center justify-center overflow-hidden">
+        <svg className="w-24 h-24 text-[#94cb04]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+        </svg>
+      </div>
+      <div className="p-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">REST API Reference</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Complete API documentation with authentication, servers, messages, and user endpoints.
+        </p>
+        <div className="flex items-center text-sm font-medium text-[#94cb04] group-hover:text-[#7aa303]">
+          Browse API docs
+          <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
-
-## Need inspiration?
-
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="rounded-2xl bg-gradient-to-r from-[#94cb04] to-[#7aa303] dark:from-[#608802] dark:to-[#4a6902] p-8 md:p-12 text-center">
+    <h2 className="text-3xl font-bold text-white mb-4">
+      Ready to Build?
+    </h2>
+    <p className="text-lg text-white/90 mb-8 max-w-2xl mx-auto">
+      Deploy your own instance and start exploring the powerful features of Null today.
+    </p>
+    <a 
+      href="/deployment/setup" 
+      className="inline-flex items-center px-8 py-3 bg-white text-[#608802] font-semibold rounded-lg hover:bg-gray-100 transition-colors no-underline"
+    >
+      View Deployment Guide
+      <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+      </svg>
+    </a>
+  </div>
+</div>

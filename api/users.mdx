@@ -1,0 +1,97 @@
+---
+title: Users
+description: Endpoints for managing user profiles and presence status
+---
+
+The Users API handles user profile management and presence status updates.
+
+## Update User Status
+
+<RequestExample>
+```bash cURL
+curl -X PATCH "https://api.example.com/users/status?status=AWAY" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{}
+```
+</ResponseExample>
+
+Updates the authenticated user's presence status.
+
+<ParamField query="status" type="string" required>
+  The new presence status. Possible values:
+  - `ONLINE` - User is connected and active (green indicator)
+  - `OFFLINE` - User is not connected (gray indicator)
+  - `AWAY` - User is connected but inactive (yellow/moon indicator)
+  - `DO_NOT_DISTURB` - User is connected but does not want notifications (red indicator)
+</ParamField>
+
+### Response
+
+Returns HTTP 200 OK with an empty body when the status is successfully updated.
+
+### Errors
+
+<ResponseField name="400" type="Bad Request">
+  Invalid status value provided.
+</ResponseField>
+
+<ResponseField name="401" type="Unauthorized">
+  Missing or invalid authentication token.
+</ResponseField>
+
+---
+
+## User Object
+
+The User object represents a user in the system. While there is no dedicated GET endpoint to retrieve user details in the current API, user information is returned as part of other responses (authentication, server members, friends list, etc.).
+
+### User Fields
+
+<ResponseField name="id" type="integer">
+  Unique identifier for the user.
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  User's email address (used as username for authentication).
+</ResponseField>
+
+<ResponseField name="fullname" type="string">
+  User's full name.
+</ResponseField>
+
+<ResponseField name="nickName" type="string">
+  User's display name shown to other users.
+</ResponseField>
+
+<ResponseField name="dateOfBirth" type="string">
+  User's date of birth in ISO 8601 format (YYYY-MM-DD).
+</ResponseField>
+
+<ResponseField name="imageUrl" type="string">
+  URL of the user's profile image/avatar.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  User's current presence status. Possible values: `ONLINE`, `OFFLINE`, `AWAY`, `DO_NOT_DISTURB`.
+</ResponseField>
+
+<ResponseField name="accountLocked" type="boolean">
+  Whether the user's account is locked.
+</ResponseField>
+
+<ResponseField name="enable" type="boolean">
+  Whether the user's account is enabled (activated).
+</ResponseField>
+
+<ResponseField name="createdDate" type="string">
+  Timestamp when the user account was created, in ISO 8601 format.
+</ResponseField>
+
+<ResponseField name="lastModifiedDate" type="string">
+  Timestamp when the user account was last modified, in ISO 8601 format.
+</ResponseField>

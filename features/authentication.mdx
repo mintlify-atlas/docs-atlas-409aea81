@@ -1,0 +1,237 @@
+---
+title: Authentication
+description: JWT-based authentication system with email activation
+---
+
+## Overview
+
+Null implements a secure authentication system using JWT tokens with email-based account activation. New users must verify their email address with a 6-digit OTP code before gaining access to the platform.
+
+## Registration Flow
+
+<Steps>
+  <Step title="User submits registration form">
+    The user provides their email, full name, nickname, password, and date of birth.
+  </Step>
+  
+  <Step title="Account created in disabled state">
+    The system creates a user account with `enable = false`, preventing login until email verification.
+  </Step>
+  
+  <Step title="OTP code sent via email">
+    A 6-digit activation code is generated and sent to the user's email via MailDev. The token expires in 15 minutes.
+  </Step>
+  
+  <Step title="User activates account">
+    The user enters the activation code, which enables their account and allows them to log in.
+  </Step>
+</Steps>
+
+## Registration Request
+
+The registration endpoint expects the following fields:
+
+```java
+public class RegistrationRequest {
+    @NotEmpty(message = "Email is required")
+    @NotBlank(message = "Blank spaces not accepted")
+    private String email;
+
+    @NotEmpty(message = "This form is required")
+    @NotBlank(message = "Blank spaces not accepted")
+    private String fullname;
+
+    @NotEmpty(message = "This form is required")
+    @NotBlank(message = "Blank spaces not accepted")
+    private String nickName;
+
+    @NotEmpty(message = "This form is required")
+    @NotBlank(message = "Blank spaces not accepted")
+    private String password;
+
+    @NotNull(message = "Date of birth is required")
+    private LocalDate dateOfBirth;
+}
+```
+
+### API Endpoint
+
+```http
+POST /auth/register
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "fullname": "John Doe",
+  "nickName": "johndoe",
+  "password": "SecurePass123",
+  "dateOfBirth": "1995-06-15"
+}
+```
+
+**Response:** `202 Accepted` - Registration successful, activation email sent.
+
+## Email Activation
+
+The activation system uses a cryptographically secure 6-digit code:
+
+```java
+private String generateActivationCode(int length) {
+    String characters = "0123456789";
+    StringBuilder codeBuilder = new StringBuilder();
+    SecureRandom random = new SecureRandom();
+
+    for (int i = 0; i < length; i++) {
+        int randomIndex = random.nextInt(characters.length());
+        codeBuilder.append(characters.charAt(randomIndex));
+    }
+
+    return codeBuilder.toString();
+}
+```
+
+### Activation Endpoint
+
+```http
+GET /auth/activate-account?token=849201
+```
+
+<Note>
+  If the activation token has expired, the system automatically sends a new code to the user's email.
+</Note>
+
+## Authentication (Login)
+
+Once activated, users can authenticate using their email and password:
+
+```java
+public class AuthenticationRequest {
+    @Email(message = "Bad format to email address")
+    @NotEmpty(message = "It must no be empty")
+    @NotBlank(message = "Learn how to type , DONT BLANK SPACES")
+    private String username;
+
+    @NotEmpty(message = "It must no be empty")
+    @NotBlank(message = "Learn how to type , DONT BLANK SPACES")
+    @Size(min = 8, message = "Generic password will not accepted")
+    private String password;
+}
+```
+
+### Login Endpoint
+
+```http
+POST /auth/authenticate
+Content-Type: application/json
+
+{
+  "username": "user@example.com",
+  "password": "SecurePass123"
+}
+```
+
+### Authentication Response
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "nickname": "johndoe",
+  "email": "user@example.com",
+  "status": "ONLINE"
+}
+```
+
+```java
+public class AuthenticationResponse {
+    private String token;      // JWT for subsequent requests
+    private String nickname;   // User's display name
+    private String email;      // User's email address
+    private UserStatus status; // ONLINE, OFFLINE, AWAY, DO_NOT_DISTURB
+}
+```
+
+<Info>
+  The JWT token contains the `userId` claim, which is essential for WebSocket connections in the chat system.
+</Info>
+
+## JWT Token Claims
+
+The authentication service generates JWT tokens with the following claims:
+
+```java
+var claims = new HashMap<String, Object>();
+claims.put("username", user.getUsername());
+claims.put("userId", user.getId());
+
+var jwtToken = jwtService.generateToken(claims, user);
+```
+
+<Warning>
+  The `userId` claim is critical for the WebSocket chat functionality. The frontend extracts this value to establish authenticated WebSocket connections.
+</Warning>
+
+## User Status Management
+
+When a user successfully authenticates, their status is automatically set to `ONLINE`:
+
+```java
+public AuthenticationResponse authenticate(AuthenticationRequest request) {
+    // ... authentication logic ...
+    
+    // Set user status to ONLINE
+    user.setStatus(UserStatus.ONLINE);
+    userRepository.save(user);
+    
+    return AuthenticationResponse.builder()
+            .token(jwtToken)
+            .nickname(user.getNickName())
+            .email(user.getEmail())
+            .status(user.getStatus())
+            .build();
+}
+```
+
+## Security Features
+
+### Password Hashing
+
+Passwords are hashed using BCrypt before storage:
+
+```java
+var user = User.builder()
+        .email(request.getEmail())
+        .fullname(request.getFullname())
+        .nickName(request.getNickName())
+        .password(passwordEncoder.encode(request.getPassword()))
+        .dateOfBirth(request.getDateOfBirth())
+        .accountLocked(false)
+        .enable(false) // Requires email activation
+        .roles(List.of(userRole))
+        .build();
+```
+
+<Warning>
+  Passwords are transmitted in plain text from the frontend to the backend over HTTPS. They are immediately hashed upon receipt and never stored in plain text.
+</Warning>
+
+### Token Expiration
+
+Activation tokens expire after 15 minutes for security:
+
+```java
+var token = Token.builder()
+        .token(generateToken)
+        .createdAt(LocalDateTime.now())
+        .expiresAt(LocalDateTime.now().plusMinutes(15))
+        .user(user)
+        .build();
+```
+
+## Implementation Reference
+
+Key files in the authentication system:
+
+- `AuthenticationController.java` - REST endpoints at [auth/AuthenticationController.java:40-84](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/auth/AuthenticationController.java)
+- `AuthenticationService.java` - Business logic at [auth/AuthenticationService.java:54-189](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/auth/AuthenticationService.java)
+- `RegistrationRequest.java` - Registration DTO at [auth/RegistrationRequest.java:26-72](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/auth/RegistrationRequest.java)
+- `AuthenticationRequest.java` - Login DTO at [auth/AuthenticationRequest.java:23-50](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/auth/AuthenticationRequest.java)

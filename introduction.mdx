@@ -1,0 +1,103 @@
+---
+title: Introduction
+description: A modern Discord clone built with Spring Boot, Angular, and event-driven architecture
+---
+
+## What is Null?
+
+Null is a full-featured communication platform inspired by Discord, built from scratch with modern architecture and best practices. It enables real-time messaging, server and channel management, friend connections, and secure authentication.
+
+Designed as a learning project to demonstrate scalable, event-driven architecture, Null showcases how to build production-ready communication systems using industry-standard technologies.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="JWT Authentication" icon="key">
+    Secure user registration and login with JWT tokens. Email verification using one-time passwords (OTP) sent via email ensures account security.
+  </Card>
+  
+  <Card title="Servers & Channels" icon="server">
+    Create and manage servers with multiple channels. Organize conversations by topic with a familiar Discord-like structure.
+  </Card>
+  
+  <Card title="Real-Time Messaging" icon="message">
+    Send and receive messages instantly using WebSockets (STOMP & SockJS). Kafka handles message distribution across the system.
+  </Card>
+  
+  <Card title="Friends System" icon="users">
+    Add friends, manage relationships, and track user status (online/offline/busy). Build your communication network.
+  </Card>
+  
+  <Card title="Event-Driven Architecture" icon="diagram-project">
+    Apache Kafka decouples services for asynchronous email notifications and message processing, enabling horizontal scalability.
+  </Card>
+  
+  <Card title="Docker Infrastructure" icon="docker">
+    Complete development environment with Docker Compose. Spin up MongoDB, PostgreSQL, Kafka, and MailDev with a single command.
+  </Card>
+</CardGroup>
+
+## Technology Stack
+
+Null is built with a modern, production-ready technology stack:
+
+### Backend
+- **Spring Boot 3.4.2** - REST API framework
+- **Java 17** - Programming language
+- **Spring Security** - JWT-based authentication and authorization
+- **Spring Data JPA** - PostgreSQL integration for user data
+- **Spring Data MongoDB** - NoSQL database for chat messages
+- **Spring Kafka** - Event streaming platform
+- **Spring WebSocket** - Real-time communication with STOMP over SockJS
+- **Thymeleaf** - HTML email template engine
+- **Lombok** - Code generation and boilerplate reduction
+
+### Frontend
+- **Angular 21** - Single Page Application framework
+- **TypeScript 5.9** - Type-safe JavaScript
+- **RxJS** - Reactive programming for async operations
+- **SockJS & STOMP** - WebSocket client libraries
+- **Bootstrap 5** - UI component library
+- **TailwindCSS** - Utility-first CSS framework
+
+### Infrastructure
+- **Docker & Docker Compose** - Container orchestration
+- **PostgreSQL** - Relational database for user accounts and authentication
+- **MongoDB** - Document database for chat messages and conversations
+- **Apache Kafka** - Message broker for event streaming
+- **MailDev** - SMTP server for testing email notifications
+- **PgAdmin** - PostgreSQL administration tool
+
+## Architecture Highlights
+
+<Note>
+  Null uses a **monorepo structure** with separate frontend and backend projects, orchestrated by Docker Compose for seamless development.
+</Note>
+
+- **RESTful API** - Spring Boot backend exposes endpoints at `/api/v1`
+- **Real-time Communication** - WebSocket connections for instant messaging
+- **Event Sourcing** - Kafka topics handle asynchronous email delivery
+- **Dual Database Strategy** - PostgreSQL for relational data, MongoDB for chat messages
+- **Stateless Authentication** - JWT tokens enable scalable session management
+
+## Use Cases
+
+Null is ideal for:
+
+- **Learning Modern Architecture** - Understand how to build scalable, event-driven systems
+- **Portfolio Projects** - Demonstrate full-stack development skills
+- **Team Communication** - Deploy as an internal chat platform
+- **Microservices Study** - Learn Kafka-based async communication patterns
+- **Real-Time Systems** - Explore WebSocket implementation with Spring
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get Null running locally in minutes
+  </Card>
+  
+  <Card title="Architecture" icon="sitemap" href="/architecture">
+    Learn about the system design and components
+  </Card>
+</CardGroup>

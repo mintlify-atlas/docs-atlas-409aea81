@@ -1,0 +1,572 @@
+---
+title: Docker Deployment
+description: Guide to deploying Null using Docker and Docker Compose
+---
+
+## Overview
+
+Null uses Docker Compose to orchestrate multiple infrastructure services required for the application. The `docker-compose.yml` file defines five services that provide database, messaging, and development tools.
+
+## Docker Compose Configuration
+
+The complete Docker Compose setup is defined in the root `docker-compose.yml` file:
+
+```yaml
+services:
+  postgres:
+    container_name: postgres-sql-null
+    image: postgres
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      PGDATA: /var/lib/postgresql/data
+      POSTGRES_DB: null_Project
+    volumes:
+      - postgres:/data/postgres
+    ports:
+      - 5431:5432
+    networks:
+      - null-network-project
+    restart: unless-stopped
+
+  pgadmin:
+    container_name: pgadmin-null
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-pgadmin@pgadmin.org}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      PGADMIN_DEFAULT_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+    ports:
+      - 5050:80
+    networks:
+      - null-network-project
+    restart: unless-stopped
+
+  mail-dev:
+    container_name: mail-dev-null
+    image: maildev/maildev
+    ports:
+      - 1080:1080
+      - 1025:1025
+
+  mongodb:
+    image: mongo:latest
+    container_name: null_mongodb
+    restart: always
+    ports:
+      - 27017:27017
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - null-network-project
+
+  kafka:
+    image: apache/kafka:latest
+    container_name: null_kafka
+    restart: always
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    networks:
+      - null-network-project
+
+networks:
+  null-network-project:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  pgadmin:
+  postgres:
+    driver: local
+```
+
+## Services Overview
+
+### PostgreSQL Database
+
+The primary relational database for user data and application state.
+
+**Container:** `postgres-sql-null`  
+**Image:** `postgres` (latest)
+
+#### Configuration
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| Port Mapping | `5431:5432` | Host port 5431 → Container port 5432 |
+| Database Name | `null_Project` | Default database |
+| Username | `admin` | Root user |
+| Password | `admin` | Root password |
+| Volume | `postgres` | Persistent data storage |
+| Data Directory | `/var/lib/postgresql/data` | Internal data path |
+
+#### Connection String
+
+```bash
+jdbc:postgresql://localhost:5431/null_Project
+```
+
+<Warning>
+  **Note:** The external port is 5431 (not the standard 5432) to avoid conflicts with local PostgreSQL installations.
+</Warning>
+
+### PgAdmin
+
+Web-based PostgreSQL administration tool.
+
+**Container:** `pgadmin-null`  
+**Image:** `dpage/pgadmin4`
+
+#### Configuration
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| Port Mapping | `5050:80` | Web interface on port 5050 |
+| Default Email | `pgadmin@pgadmin.org` | Login email (configurable) |
+| Default Password | `admin` | Login password (configurable) |
+| Server Mode | `False` | Desktop mode |
+| Volume | `pgadmin` | Settings persistence |
+
+#### Accessing PgAdmin
+
+1. Open http://localhost:5050
+2. Login with `pgadmin@pgadmin.org` / `admin`
+3. Add a new server:
+   - **Name:** Null PostgreSQL
+   - **Host:** `postgres-sql-null` (container name)
+   - **Port:** `5432` (internal port)
+   - **Username:** `admin`
+   - **Password:** `admin`
+   - **Database:** `null_Project`
+
+<Warning>
+  When connecting from PgAdmin to PostgreSQL, use the container name `postgres-sql-null` and internal port `5432`, not `localhost:5431`.
+</Warning>
+
+### MongoDB
+
+Document database for chat messages and real-time data.
+
+**Container:** `null_mongodb`  
+**Image:** `mongo:latest`
+
+#### Configuration
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| Port Mapping | `27017:27017` | Standard MongoDB port |
+| Root Username | `admin` | Admin user |
+| Root Password | `admin` | Admin password |
+| Volume | `mongo_data` | Database persistence |
+| Data Directory | `/data/db` | Internal data path |
+
+#### Connection String
+
+```bash
+mongodb://admin:admin@localhost:27017/null_chat?authSource=admin
+```
+
+#### Connecting with MongoDB Compass
+
+```
+mongodb://admin:admin@localhost:27017/?authSource=admin
+```
+
+### Apache Kafka
+
+Event streaming platform for asynchronous messaging.
+
+**Container:** `null_kafka`  
+**Image:** `apache/kafka:latest`
+
+#### Configuration
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| Port Mapping | `9092:9092` | Kafka broker port |
+| Node ID | `1` | Kafka node identifier |
+| Process Roles | `broker,controller` | Combined mode (KRaft) |
+| Cluster ID | `MkU3OEVBNTcwNTJENDM2Qk` | Unique cluster identifier |
+| Replication Factor | `1` | Single-node setup |
+
+#### Kafka Listeners
+
+- **PLAINTEXT:** `0.0.0.0:9092` - Client connections
+- **CONTROLLER:** `0.0.0.0:9093` - Internal controller
+
+#### Bootstrap Server
+
+```bash
+localhost:9092
+```
+
+<Warning>
+  This is a single-node Kafka setup using KRaft mode (without Zookeeper). For production, use a multi-node cluster with proper replication.
+</Warning>
+
+### MailDev
+
+Email testing tool for development environments.
+
+**Container:** `mail-dev-null`  
+**Image:** `maildev/maildev`
+
+#### Configuration
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| Web UI Port | `1080:1080` | Email viewer interface |
+| SMTP Port | `1025:1025` | SMTP server for sending |
+| Network | None | Standalone service |
+
+#### Accessing MailDev
+
+- **Web Interface:** http://localhost:1080 - View captured emails
+- **SMTP Server:** `localhost:1025` - Configure in application
+
+All emails sent from the application will be captured and displayed in the web interface.
+
+## Network Configuration
+
+All services (except MailDev) are connected to a custom bridge network:
+
+```yaml
+networks:
+  null-network-project:
+    driver: bridge
+```
+
+This allows containers to communicate using their container names:
+- `postgres-sql-null`
+- `null_mongodb`
+- `null_kafka`
+- `pgadmin-null`
+
+## Volume Configuration
+
+Data persistence is handled through Docker volumes:
+
+```yaml
+volumes:
+  mongo_data:      # MongoDB data
+  pgadmin:         # PgAdmin settings
+  postgres:        # PostgreSQL data
+    driver: local
+```
+
+These volumes persist data even when containers are stopped or removed.
+
+## Port Mapping Summary
+
+| Service | Host Port | Container Port | Purpose |
+|---------|-----------|----------------|----------|
+| PostgreSQL | 5431 | 5432 | Database connections |
+| PgAdmin | 5050 | 80 | Web interface |
+| MongoDB | 27017 | 27017 | Database connections |
+| Kafka | 9092 | 9092 | Broker connections |
+| MailDev Web | 1080 | 1080 | Email viewer |
+| MailDev SMTP | 1025 | 1025 | SMTP server |
+
+## Managing Services
+
+### Starting All Services
+
+```bash
+# Start all services in detached mode
+docker-compose up -d
+
+# View startup logs
+docker-compose logs -f
+```
+
+### Stopping Services
+
+```bash
+# Stop all services (keeps volumes)
+docker-compose down
+
+# Stop and remove volumes (deletes all data)
+docker-compose down -v
+```
+
+### Viewing Service Status
+
+```bash
+# List running containers
+docker-compose ps
+
+# View service logs
+docker-compose logs [service-name]
+
+# Follow logs in real-time
+docker-compose logs -f [service-name]
+```
+
+### Restarting Individual Services
+
+```bash
+# Restart a specific service
+docker-compose restart postgres
+docker-compose restart mongodb
+docker-compose restart kafka
+```
+
+### Viewing Resource Usage
+
+```bash
+# View container resource usage
+docker stats
+```
+
+## Troubleshooting
+
+<Accordion title="PostgreSQL: Connection refused on port 5431">
+  **Symptoms:** Cannot connect to PostgreSQL from the application.
+
+  **Solutions:**
+  1. Check if the container is running:
+     ```bash
+     docker-compose ps postgres
+     ```
+  
+  2. Verify the port mapping:
+     ```bash
+     docker port postgres-sql-null
+     ```
+  
+  3. Check container logs:
+     ```bash
+     docker-compose logs postgres
+     ```
+  
+  4. Ensure no other service is using port 5431:
+     ```bash
+     lsof -i :5431  # macOS/Linux
+     netstat -ano | findstr :5431  # Windows
+     ```
+</Accordion>
+
+<Accordion title="MongoDB: Authentication failed">
+  **Symptoms:** Application cannot connect to MongoDB.
+
+  **Solutions:**
+  1. Verify credentials in connection string:
+     ```
+     mongodb://admin:admin@localhost:27017/null_chat?authSource=admin
+     ```
+  
+  2. Check MongoDB logs:
+     ```bash
+     docker-compose logs mongodb
+     ```
+  
+  3. Access MongoDB shell to verify:
+     ```bash
+     docker exec -it null_mongodb mongosh -u admin -p admin --authenticationDatabase admin
+     ```
+</Accordion>
+
+<Accordion title="Kafka: Cannot connect to broker">
+  **Symptoms:** Application fails to connect to Kafka.
+
+  **Solutions:**
+  1. Verify Kafka is running:
+     ```bash
+     docker-compose ps kafka
+     ```
+  
+  2. Check Kafka logs:
+     ```bash
+     docker-compose logs kafka
+     ```
+  
+  3. Verify listeners configuration:
+     ```bash
+     docker exec -it null_kafka kafka-metadata.sh --snapshot /var/lib/kafka/data/__cluster_metadata-0/00000000000000000000.log --print-contents
+     ```
+  
+  4. Test connection:
+     ```bash
+     docker exec -it null_kafka kafka-topics.sh --bootstrap-server localhost:9092 --list
+     ```
+</Accordion>
+
+<Accordion title="PgAdmin: Cannot connect to database server">
+  **Symptoms:** PgAdmin shows "could not connect to server."
+
+  **Solutions:**
+  1. Use container name, not localhost:
+     - **Host:** `postgres-sql-null` (not `localhost`)
+     - **Port:** `5432` (not `5431`)
+  
+  2. Ensure both containers are on the same network:
+     ```bash
+     docker inspect postgres-sql-null | grep NetworkMode
+     docker inspect pgadmin-null | grep NetworkMode
+     ```
+  
+  3. Both should show `null-network-project`
+</Accordion>
+
+<Accordion title="MailDev: Emails not appearing">
+  **Symptoms:** Application sends emails but they don't appear in MailDev.
+
+  **Solutions:**
+  1. Verify MailDev is running:
+     ```bash
+     docker-compose ps mail-dev
+     ```
+  
+  2. Check application mail configuration:
+     ```yaml
+     spring:
+       mail:
+         host: localhost
+         port: 1025
+     ```
+  
+  3. View MailDev logs:
+     ```bash
+     docker-compose logs mail-dev
+     ```
+  
+  4. Ensure no firewall is blocking port 1025
+</Accordion>
+
+<Accordion title="Volumes: How to reset all data">
+  **Warning:** This will delete all database data!
+
+  ```bash
+  # Stop services and remove volumes
+  docker-compose down -v
+  
+  # Start fresh
+  docker-compose up -d
+  ```
+  
+  To reset only specific services:
+  ```bash
+  # Remove specific volume
+  docker volume rm null_mongo_data
+  docker volume rm null_postgres
+  ```
+</Accordion>
+
+<Accordion title="Port conflicts with existing services">
+  **Symptoms:** Error: "port is already allocated."
+
+  **Solutions:**
+  1. Identify conflicting process:
+     ```bash
+     # macOS/Linux
+     lsof -i :5431
+     lsof -i :27017
+     lsof -i :9092
+     
+     # Windows
+     netstat -ano | findstr :5431
+     ```
+  
+  2. Stop the conflicting service or modify `docker-compose.yml` to use different ports:
+     ```yaml
+     postgres:
+       ports:
+         - 5433:5432  # Changed from 5431
+     ```
+  
+  3. Update application configuration to match new ports
+</Accordion>
+
+## Production Considerations
+
+### Security
+
+<Warning>
+  **Critical:** The default configuration uses weak credentials (`admin/admin`). For production:
+  
+  1. Change all default passwords
+  2. Use environment variables for credentials
+  3. Enable SSL/TLS for all connections
+  4. Use secrets management (Docker Swarm secrets, Kubernetes secrets)
+</Warning>
+
+### Environment Variables
+
+Create a `.env` file for production credentials:
+
+```bash
+# PostgreSQL
+POSTGRES_USER=secure_user
+POSTGRES_PASSWORD=secure_password_here
+POSTGRES_DB=null_Project
+
+# MongoDB
+MONGO_ROOT_USERNAME=secure_user
+MONGO_ROOT_PASSWORD=secure_password_here
+
+# PgAdmin
+PGADMIN_DEFAULT_EMAIL=admin@yourdomain.com
+PGADMIN_DEFAULT_PASSWORD=secure_password_here
+```
+
+Update `docker-compose.yml` to use variables:
+
+```yaml
+postgres:
+  environment:
+    POSTGRES_USER: ${POSTGRES_USER}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    POSTGRES_DB: ${POSTGRES_DB}
+```
+
+### Scaling Considerations
+
+1. **Kafka:** Use multi-broker cluster with proper replication
+2. **PostgreSQL:** Consider managed services (AWS RDS, Azure Database)
+3. **MongoDB:** Use replica sets for high availability
+4. **Monitoring:** Add Prometheus + Grafana for metrics
+5. **Logging:** Integrate centralized logging (ELK stack)
+
+### Health Checks
+
+Add health checks to `docker-compose.yml`:
+
+```yaml
+postgres:
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U admin"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+mongodb:
+  healthcheck:
+    test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+    interval: 10s
+    timeout: 5s
+    retries: 5
+```
+
+## Next Steps
+
+- Review [Configuration Reference](/deployment/configuration) for application settings
+- Configure environment-specific settings in `application-prod.yml`
+- Set up monitoring and logging for production deployments
+- Implement backup strategies for PostgreSQL and MongoDB

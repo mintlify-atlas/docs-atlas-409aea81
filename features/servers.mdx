@@ -1,0 +1,309 @@
+---
+title: Servers
+description: Create and manage community servers with channels and members
+---
+
+## Overview
+
+Servers are community spaces where users can gather, communicate, and organize channels. Each server has an owner, members, and multiple channels for different topics or purposes.
+
+## Server Model
+
+The `Server` entity represents a community with the following structure:
+
+```java
+@Entity
+public class Server {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(unique = true)
+    private String name;
+
+    private String imageUrl;
+
+    @ManyToOne
+    @JoinColumn(name = "owner_id")
+    private User owner;
+
+    @ManyToMany
+    @JoinTable(
+        name = "server_members",
+        joinColumns = @JoinColumn(name = "server_id"),
+        inverseJoinColumns = @JoinColumn(name = "user_id")
+    )
+    private Set<User> members;
+
+    @OneToMany(mappedBy = "server", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Channel> channels;
+}
+```
+
+<Info>
+  Server names must be unique across the platform. The `members` field uses a `Set` to ensure users cannot join the same server multiple times.
+</Info>
+
+## Creating a Server
+
+<Steps>
+  <Step title="Submit server details">
+    The user provides a server name and optional image URL.
+  </Step>
+  
+  <Step title="User assigned as owner">
+    The authenticated user automatically becomes the server owner and first member.
+  </Step>
+  
+  <Step title="Default channel created">
+    A "general" text channel is created automatically.
+  </Step>
+  
+  <Step title="Server saved and returned">
+    The server is persisted to the database and returned with full details.
+  </Step>
+</Steps>
+
+### Create Server Request
+
+```java
+public class ServerRequest {
+    @NotBlank(message = "Server's name is required")
+    private String name;
+    
+    private String imageUrl; // Optional
+}
+```
+
+### API Endpoint
+
+```http
+POST /servers
+Authorization: Bearer {jwt_token}
+Content-Type: application/json
+
+{
+  "name": "My Community",
+  "imageUrl": "https://example.com/server-icon.png"
+}
+```
+
+### Create Server Implementation
+
+```java
+public ServerResponse createServer(ServerRequest request, Authentication connectedUser) {
+    User user = (User) connectedUser.getPrincipal();
+
+    Server newServer = Server.builder()
+            .name(request.getName())
+            .imageUrl(request.getImageUrl())
+            .owner(user)
+            .members(Set.of(user))  // Owner is automatically a member
+            .build();
+
+    // Create default "general" channel
+    Channel defaultChannel = Channel.builder()
+            .name("general")
+            .type("TEXT")
+            .server(newServer)
+            .build();
+
+    newServer.setChannels(List.of(defaultChannel));
+
+    Server savedServer = serverRepository.save(newServer);
+    return mapToResponse(savedServer);
+}
+```
+
+<Note>
+  The server creator is automatically added to the `members` set using `Set.of(user)`. This ensures "My Servers" queries work correctly from the moment of creation.
+</Note>
+
+## Server Discovery
+
+Users can browse all available servers on the platform:
+
+```http
+GET /servers/discover
+Authorization: Bearer {jwt_token}
+```
+
+**Response:**
+
+```json
+[
+  {
+    "id": 1,
+    "name": "Gaming Community",
+    "imageUrl": "https://example.com/gaming.png",
+    "channels": [
+      {
+        "id": 1,
+        "name": "general",
+        "type": "TEXT",
+        "isPrivate": false
+      }
+    ],
+    "members": [
+      {
+        "id": 5,
+        "username": "user@example.com",
+        "imageUrl": "https://example.com/avatar.png"
+      }
+    ]
+  }
+]
+```
+
+## My Servers
+
+Retrieve all servers where the authenticated user is a member:
+
+```http
+GET /servers/my-servers
+Authorization: Bearer {jwt_token}
+```
+
+```java
+public List<ServerResponse> findByUser(Authentication connectedUser) {
+    User user = (User) connectedUser.getPrincipal();
+    return serverRepository.findAllByMembersId(user.getId())
+            .stream()
+            .map(this::mapToResponse)
+            .collect(Collectors.toList());
+}
+```
+
+## Server Details
+
+Get complete information about a specific server, including channels and members:
+
+```http
+GET /servers/{serverId}
+Authorization: Bearer {jwt_token}
+```
+
+## Joining a Server
+
+Users can join existing servers to become members:
+
+```http
+POST /servers/{serverId}/join
+Authorization: Bearer {jwt_token}
+```
+
+```java
+public ServerResponse joinServer(Long serverId, Authentication connectedUser) {
+    User user = (User) connectedUser.getPrincipal();
+
+    Server server = serverRepository.findById(serverId)
+            .orElseThrow(() -> new RuntimeException("Server not found"));
+
+    // Add user to members (Set prevents duplicates)
+    server.getMembers().add(user);
+
+    Server savedServer = serverRepository.save(server);
+    return mapToResponse(savedServer);
+}
+```
+
+<Info>
+  Because `members` is a `Set`, attempting to join a server you're already a member of has no effect.
+</Info>
+
+## Leaving a Server
+
+Members can leave servers, but the owner cannot abandon their own server:
+
+```http
+POST /servers/{serverId}/leave
+Authorization: Bearer {jwt_token}
+```
+
+```java
+public void leaveServer(Long serverId, Authentication connectedUser) {
+    User user = (User) connectedUser.getPrincipal();
+
+    Server server = serverRepository.findById(serverId)
+            .orElseThrow(() -> new RuntimeException("Server not found"));
+
+    // Prevent owner from leaving
+    if (server.getOwner().getId().equals(user.getId())) {
+        throw new RuntimeException(
+            "The owner cannot leave the server. You must delete it."
+        );
+    }
+
+    // Remove user from members
+    server.getMembers().removeIf(member -> member.getId().equals(user.getId()));
+
+    serverRepository.save(server);
+}
+```
+
+<Warning>
+  Server owners cannot leave their own servers. They must delete the server instead, which will cascade delete all channels and content.
+</Warning>
+
+## Managing Server Members
+
+The `ServerResponse` DTO includes member information:
+
+```java
+@Builder
+public class ServerResponse {
+    private Long id;
+    private String name;
+    private String imageUrl;
+    private List<ChannelResponse> channels;
+    private List<MemberResponse> members;
+}
+
+@Builder
+public class MemberResponse {
+    private Integer id;
+    private String username;
+    private String imageUrl;
+}
+```
+
+## Server-Channel Relationship
+
+Servers have a one-to-many relationship with channels:
+
+```java
+@OneToMany(mappedBy = "server", cascade = CascadeType.ALL, orphanRemoval = true)
+private List<Channel> channels;
+```
+
+<Note>
+  The `cascade = CascadeType.ALL` and `orphanRemoval = true` settings ensure that when a server is deleted, all its channels are automatically deleted as well.
+</Note>
+
+## Creating Channels in a Server
+
+Server members can create new channels within a server:
+
+```http
+POST /servers/{serverId}/channels
+Authorization: Bearer {jwt_token}
+Content-Type: application/json
+
+{
+  "name": "announcements",
+  "type": "TEXT",
+  "isPrivate": false
+}
+```
+
+See the [Channels](/features/channels) documentation for more details.
+
+## Implementation Reference
+
+Key files in the server system:
+
+- `Server.java` - Entity model at [server/Server.java:24-84](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/server/Server.java)
+- `ServerController.java` - REST endpoints at [server/ServerController.java:21-134](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/server/ServerController.java)
+- `ServerService.java` - Business logic at [server/ServerService.java:22-227](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/server/ServerService.java)
+- `ServerRequest.java` - Create/update DTO at [server/ServerRequest.java:19-41](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/server/ServerRequest.java)
+- `ServerResponse.java` - Response DTO at [server/ServerResponse.java:22-53](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/server/ServerResponse.java)

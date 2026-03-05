@@ -1,0 +1,392 @@
+---
+title: Servers
+description: Endpoints for managing servers, members, and channels
+---
+
+The Servers API handles server (community) management, including discovery, membership, and channel creation.
+
+## Discover Servers
+
+<RequestExample>
+```bash cURL
+curl -X GET https://api.example.com/servers/discover \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+[
+  {
+    "id": 1,
+    "name": "Gaming Community",
+    "imageUrl": "https://example.com/images/server1.png",
+    "channels": [
+      {
+        "id": 1,
+        "name": "general",
+        "type": "TEXT",
+        "isPrivate": false
+      }
+    ],
+    "members": [
+      {
+        "id": 123,
+        "username": "johndoe",
+        "imageUrl": "https://example.com/avatars/user123.png"
+      }
+    ]
+  }
+]
+```
+</ResponseExample>
+
+Retrieves a list of all available servers on the platform for the discovery section.
+
+### Response
+
+<ResponseField name="id" type="integer">
+  Unique identifier for the server.
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Public name of the server displayed in discovery lists.
+</ResponseField>
+
+<ResponseField name="imageUrl" type="string">
+  URL of the server's icon image.
+</ResponseField>
+
+<ResponseField name="channels" type="array">
+  List of channels in the server.
+  <Expandable title="Channel Object">
+    <ResponseField name="id" type="integer">
+      Channel identifier.
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      Channel name.
+    </ResponseField>
+    <ResponseField name="type" type="string">
+      Channel type (TEXT or VOICE).
+    </ResponseField>
+    <ResponseField name="isPrivate" type="boolean">
+      Whether the channel is private.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="members" type="array">
+  List of server members.
+  <Expandable title="Member Object">
+    <ResponseField name="id" type="integer">
+      User identifier.
+    </ResponseField>
+    <ResponseField name="username" type="string">
+      User's display name.
+    </ResponseField>
+    <ResponseField name="imageUrl" type="string">
+      User's avatar URL.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+---
+
+## Get My Servers
+
+<RequestExample>
+```bash cURL
+curl -X GET https://api.example.com/servers/my-servers \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+[
+  {
+    "id": 1,
+    "name": "My Server",
+    "imageUrl": "https://example.com/images/server1.png",
+    "channels": [],
+    "members": []
+  }
+]
+```
+</ResponseExample>
+
+Retrieves servers where the authenticated user is a member or owner.
+
+### Response
+
+Returns an array of server objects with the same structure as the Discover Servers endpoint.
+
+---
+
+## Create Server
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.example.com/servers \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Gaming Server",
+    "imageUrl": "https://example.com/images/myserver.png"
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{
+  "id": 42,
+  "name": "My Gaming Server",
+  "imageUrl": "https://example.com/images/myserver.png",
+  "channels": [],
+  "members": [
+    {
+      "id": 123,
+      "username": "johndoe",
+      "imageUrl": "https://example.com/avatars/user123.png"
+    }
+  ]
+}
+```
+</ResponseExample>
+
+Creates a new server. The authenticated user is automatically assigned as the owner.
+
+<ParamField path="name" type="string" required>
+  Server name. Cannot be blank or contain only spaces.
+</ParamField>
+
+<ParamField path="imageUrl" type="string">
+  URL of the server icon. Optional - if not provided, a default image may be used.
+</ParamField>
+
+### Response
+
+Returns the created server object.
+
+### Errors
+
+<ResponseField name="400" type="Bad Request">
+  Server name is required and cannot be blank.
+</ResponseField>
+
+---
+
+## Get Server by ID
+
+<RequestExample>
+```bash cURL
+curl -X GET https://api.example.com/servers/1 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{
+  "id": 1,
+  "name": "Gaming Community",
+  "imageUrl": "https://example.com/images/server1.png",
+  "channels": [
+    {
+      "id": 1,
+      "name": "general",
+      "type": "TEXT",
+      "isPrivate": false
+    },
+    {
+      "id": 2,
+      "name": "voice-chat",
+      "type": "TEXT",
+      "isPrivate": false
+    }
+  ],
+  "members": [
+    {
+      "id": 123,
+      "username": "johndoe",
+      "imageUrl": "https://example.com/avatars/user123.png"
+    }
+  ]
+}
+```
+</ResponseExample>
+
+Retrieves detailed information about a specific server, including its channels and members.
+
+<ParamField path="serverId" type="integer" required>
+  The ID of the server to retrieve.
+</ParamField>
+
+### Response
+
+Returns a server object with complete channel and member information.
+
+### Errors
+
+<ResponseField name="404" type="Not Found">
+  Server not found.
+</ResponseField>
+
+---
+
+## Join Server
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.example.com/servers/1/join \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{
+  "id": 1,
+  "name": "Gaming Community",
+  "imageUrl": "https://example.com/images/server1.png",
+  "channels": [],
+  "members": []
+}
+```
+</ResponseExample>
+
+Allows the authenticated user to join a server.
+
+<ParamField path="serverId" type="integer" required>
+  The ID of the server to join.
+</ParamField>
+
+### Response
+
+Returns the server object that was joined.
+
+### Errors
+
+<ResponseField name="404" type="Not Found">
+  Server not found.
+</ResponseField>
+
+<ResponseField name="400" type="Bad Request">
+  User is already a member of this server.
+</ResponseField>
+
+---
+
+## Leave Server
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.example.com/servers/1/leave \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{}
+```
+</ResponseExample>
+
+Allows the authenticated user to leave a server.
+
+<ParamField path="serverId" type="integer" required>
+  The ID of the server to leave.
+</ParamField>
+
+### Response
+
+Returns HTTP 200 OK with an empty body.
+
+### Errors
+
+<ResponseField name="404" type="Not Found">
+  Server not found.
+</ResponseField>
+
+<ResponseField name="400" type="Bad Request">
+  User is not a member of this server.
+</ResponseField>
+
+---
+
+## Create Channel
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.example.com/servers/1/channels \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "announcements",
+    "type": "TEXT",
+    "isPrivate": false
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{
+  "id": 5,
+  "name": "announcements",
+  "type": "TEXT",
+  "isPrivate": false
+}
+```
+</ResponseExample>
+
+Creates a new channel within a server.
+
+<ParamField path="serverId" type="integer" required>
+  The ID of the server where the channel will be created.
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Channel name. Cannot be blank or contain only spaces.
+</ParamField>
+
+<ParamField path="type" type="string">
+  Channel type. Defaults to "TEXT". Possible values: TEXT, VOICE.
+</ParamField>
+
+<ParamField path="isPrivate" type="boolean">
+  Whether the channel is private. Optional.
+</ParamField>
+
+### Response
+
+<ResponseField name="id" type="integer">
+  Unique identifier for the created channel.
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Channel name.
+</ResponseField>
+
+<ResponseField name="type" type="string">
+  Channel type (TEXT or VOICE).
+</ResponseField>
+
+<ResponseField name="isPrivate" type="boolean">
+  Whether the channel is private.
+</ResponseField>
+
+### Errors
+
+<ResponseField name="400" type="Bad Request">
+  Channel name is required and cannot be blank.
+</ResponseField>
+
+<ResponseField name="404" type="Not Found">
+  Server not found.
+</ResponseField>
+
+<ResponseField name="403" type="Forbidden">
+  User does not have permission to create channels in this server.
+</ResponseField>

@@ -1,0 +1,347 @@
+---
+title: Friends
+description: Friend request system with presence status tracking
+---
+
+## Overview
+
+The friend system enables users to connect with each other through a two-step request workflow. Friends can see each other's online status and engage in direct messaging.
+
+## Friendship Model
+
+The `Friends` entity tracks relationships between users:
+
+```java
+@Entity
+@Table(name = "friends")
+public class Friends {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne
+    @JoinColumn(name = "requester_id")
+    private User requester;  // User who sent the request
+
+    @ManyToOne
+    @JoinColumn(name = "addresse_id")
+    private User addressee;  // User who received the request
+
+    @Enumerated(EnumType.STRING)
+    private FriendShipStatus status;
+
+    private LocalDateTime createdAt;
+}
+```
+
+## Friendship Status
+
+Friend relationships progress through different statuses:
+
+```java
+public enum FriendShipStatus {
+    PENDING,   // Request sent, awaiting acceptance
+    ACCEPTED,  // Friends - can see status and DM
+    BLOCKED    // User blocked
+}
+```
+
+<CardGroup cols={3}>
+  <Card title="PENDING" icon="clock" color="#fbbf24">
+    Request sent but not yet accepted
+  </Card>
+  <Card title="ACCEPTED" icon="check" color="#10b981">
+    Active friendship established
+  </Card>
+  <Card title="BLOCKED" icon="ban" color="#ef4444">
+    User blocked (future feature)
+  </Card>
+</CardGroup>
+
+## Friend Request Workflow
+
+<Steps>
+  <Step title="User sends friend request">
+    The requester sends a friend request to another user by their ID.
+  </Step>
+  
+  <Step title="Friendship created with PENDING status">
+    A `Friends` record is created with status `PENDING`.
+  </Step>
+  
+  <Step title="Addressee receives notification">
+    The target user can view pending requests in their friend requests list.
+  </Step>
+  
+  <Step title="Addressee accepts request">
+    When accepted, the status changes to `ACCEPTED` and both users become friends.
+  </Step>
+</Steps>
+
+## Sending Friend Requests
+
+Users can send friend requests by specifying the target user's ID:
+
+```http
+POST /friends/request/{targetUserId}
+Authorization: Bearer {jwt_token}
+```
+
+**Example:**
+
+```http
+POST /friends/request/42
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Response:**
+
+```json
+{
+  "message": "Friend request has been sent"
+}
+```
+
+### Controller Implementation
+
+```java
+@PostMapping("/request/{targetUserId}")
+public ResponseEntity<Map<String, String>> requestFriends(
+        @PathVariable("targetUserId") Integer targetUserId,
+        Authentication connectedUser
+){
+    friendsService.sendFriendRequest(targetUserId, connectedUser);
+    return ResponseEntity.ok(Map.of("message", "Friend request has been sent"));
+}
+```
+
+## Accepting Friend Requests
+
+The addressee accepts a request using the friendship ID:
+
+```http
+PATCH /friends/accept/{friendshipId}
+Authorization: Bearer {jwt_token}
+```
+
+**Example:**
+
+```http
+PATCH /friends/accept/15
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Response:**
+
+```json
+{
+  "message": "Friend request has been accepted"
+}
+```
+
+### Controller Implementation
+
+```java
+@PatchMapping("/accept/{friendshipId}")
+public ResponseEntity<Map<String, String>> acceptFriendRequest(
+        @PathVariable("friendshipId") Long friendshipId,
+        Authentication connectedUser
+){
+    friendsService.acceptFriendRequest(friendshipId, connectedUser);
+    return ResponseEntity.ok(Map.of("message","Friend request has been accepted"));
+}
+```
+
+<Info>
+  The friendship ID is returned in the pending requests list and must be used when accepting requests.
+</Info>
+
+## Viewing Friend Requests
+
+### Pending Requests
+
+Retrieve all incoming friend requests:
+
+```http
+GET /friends/pending
+Authorization: Bearer {jwt_token}
+```
+
+**Response:**
+
+```json
+[
+  {
+    "friendshipId": 15,
+    "requesterId": 8,
+    "requesterNickname": "gamer123",
+    "createdAt": "2026-03-05T10:30:00"
+  },
+  {
+    "friendshipId": 17,
+    "requesterId": 12,
+    "requesterNickname": "cooluser",
+    "createdAt": "2026-03-05T11:45:00"
+  }
+]
+```
+
+### Friend Request DTO
+
+```java
+@Data
+@Builder
+public class FriendRequestDTO {
+    private Long friendshipId;
+    private Integer requesterId;
+    private String requesterNickname;
+    private LocalDateTime createdAt;
+}
+```
+
+## Viewing Friends List
+
+Retrieve all accepted friends with their current status:
+
+```http
+GET /friends
+Authorization: Bearer {jwt_token}
+```
+
+**Response:**
+
+```json
+[
+  {
+    "id": 8,
+    "name": "gamer123",
+    "status": "ONLINE"
+  },
+  {
+    "id": 12,
+    "name": "cooluser",
+    "status": "AWAY"
+  },
+  {
+    "id": 20,
+    "name": "developer42",
+    "status": "DO_NOT_DISTURB"
+  }
+]
+```
+
+### Friend Response DTO
+
+```java
+@Data
+@Builder
+public class FriendResponseDTO {
+    private Integer id;
+    private String name;
+    private UserStatus status;
+}
+```
+
+## User Presence Status
+
+Friends can see each other's presence status in real-time:
+
+```java
+public enum UserStatus {
+    ONLINE,          // User is active (green circle 🟢)
+    OFFLINE,         // User is disconnected (gray circle ⚪)
+    AWAY,            // User is idle (yellow moon 🌙)
+    DO_NOT_DISTURB   // User doesn't want notifications (red circle 🔴)
+}
+```
+
+<CardGroup cols={2}>
+  <Card title="ONLINE" icon="circle" color="#10b981">
+    User is actively connected and available
+  </Card>
+  <Card title="OFFLINE" icon="circle" color="#6b7280">
+    User is not connected to the platform
+  </Card>
+  <Card title="AWAY" icon="moon" color="#fbbf24">
+    User is idle or away from keyboard
+  </Card>
+  <Card title="DO_NOT_DISTURB" icon="ban" color="#ef4444">
+    User is busy and doesn't want interruptions
+  </Card>
+</CardGroup>
+
+<Info>
+  User status is automatically set to `ONLINE` when authenticating and can be manually changed by the user.
+</Info>
+
+## Status Updates
+
+When a user logs in, their status is automatically set to ONLINE:
+
+```java
+public AuthenticationResponse authenticate(AuthenticationRequest request) {
+    // ... authentication logic ...
+    
+    // Set status to ONLINE
+    user.setStatus(UserStatus.ONLINE);
+    userRepository.save(user);
+    
+    return AuthenticationResponse.builder()
+            .token(jwtToken)
+            .nickname(user.getNickName())
+            .email(user.getEmail())
+            .status(user.getStatus())
+            .build();
+}
+```
+
+## Friend Discovery
+
+Users need to know the target user's ID to send friend requests. Friend discovery can be implemented through:
+
+<CardGroup cols={3}>
+  <Card title="User Search" icon="magnifying-glass">
+    Search users by nickname or email
+  </Card>
+  <Card title="Server Members" icon="users">
+    Add friends from shared server member lists
+  </Card>
+  <Card title="Friend Suggestions" icon="user-plus">
+    Recommend mutual server members
+  </Card>
+</CardGroup>
+
+<Note>
+  Friend discovery endpoints are not yet implemented. Users currently need to know the target user's ID directly.
+</Note>
+
+## Direct Messaging Integration
+
+Once a friendship is `ACCEPTED`, users can send direct messages to each other through the conversation system:
+
+```java
+// In Message.java
+private Long conversationId;  // Links to a DM conversation
+```
+
+See the [Messaging](/features/messaging) documentation for details on direct message functionality.
+
+## Controller Endpoints Summary
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/friends/request/{userId}` | Send friend request |
+| `PATCH` | `/friends/accept/{friendshipId}` | Accept friend request |
+| `GET` | `/friends` | Get all accepted friends |
+| `GET` | `/friends/pending` | Get pending requests |
+
+## Implementation Reference
+
+Key files in the friends system:
+
+- `Friends.java` - Entity model at [friends/Friends.java:16-35](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/friends/Friends.java)
+- `FriendsController.java` - REST endpoints at [friends/FriendsController.java:15-54](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/friends/FriendsController.java)
+- `FriendShipStatus.java` - Status enum at [friends/FriendShipStatus.java:3-7](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/friends/FriendShipStatus.java)
+- `FriendRequestDTO.java` - Pending request DTO at [friends/FriendRequestDTO.java:14-20](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/friends/FriendRequestDTO.java)
+- `FriendResponseDTO.java` - Friend list DTO at [friends/FriendResponseDTO.java:13-18](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/friends/FriendResponseDTO.java)
+- `UserStatus.java` - Presence status enum at [user/UserStatus.java:10-31](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/user/UserStatus.java)

@@ -1,0 +1,159 @@
+---
+title: Authentication
+description: Endpoints for user registration, login, and account activation
+---
+
+The Authentication API handles user onboarding, including registration, account activation via email, and login.
+
+## Register User
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.example.com/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "fullname": "John Doe",
+    "nickName": "johndoe",
+    "password": "securePassword123",
+    "dateOfBirth": "1995-06-15"
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 202 Accepted
+{}
+```
+</ResponseExample>
+
+<ParamField path="email" type="string" required>
+  User's email address. Used as the unique identifier for login.
+</ParamField>
+
+<ParamField path="fullname" type="string" required>
+  User's full name for formal purposes.
+</ParamField>
+
+<ParamField path="nickName" type="string" required>
+  Display name that other users will see in friend lists and chat rooms.
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  User's chosen password. Minimum 8 characters required.
+</ParamField>
+
+<ParamField path="dateOfBirth" type="string" required>
+  User's date of birth in ISO 8601 format (YYYY-MM-DD).
+</ParamField>
+
+### Response
+
+Returns HTTP 202 Accepted. The user account is created in an inactive state (enabled = false). An activation email with a 6-digit code is sent immediately after registration.
+
+### Errors
+
+<ResponseField name="400" type="Bad Request">
+  Validation errors:
+  - Email is required or contains blank spaces
+  - Fullname is required or contains blank spaces
+  - Nickname is required or contains blank spaces
+  - Password is required or contains blank spaces
+  - Date of birth is required
+</ResponseField>
+
+---
+
+## Authenticate User
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.example.com/auth/authenticate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "user@example.com",
+    "password": "securePassword123"
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "nickname": "johndoe",
+  "email": "user@example.com",
+  "status": "ONLINE"
+}
+```
+</ResponseExample>
+
+<ParamField path="username" type="string" required>
+  User's email address used for login.
+</ParamField>
+
+<ParamField path="password" type="string" required>
+  User's password. Minimum 8 characters.
+</ParamField>
+
+### Response
+
+<ResponseField name="token" type="string">
+  JWT token to be included in the Authorization header (Bearer token) for all subsequent requests. The token contains the userId in its claims, which is required for WebSocket chat connections.
+</ResponseField>
+
+<ResponseField name="nickname" type="string">
+  User's display name. Sent to allow the frontend to personalize the UI immediately without decoding the JWT.
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  User's email address.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  User's presence status. Possible values: `ONLINE`, `OFFLINE`, `AWAY`, `DO_NOT_DISTURB`.
+</ResponseField>
+
+### Errors
+
+<ResponseField name="400" type="Bad Request">
+  Validation errors:
+  - Email format is invalid
+  - Username or password is empty or contains only blank spaces
+  - Password is less than 8 characters
+</ResponseField>
+
+<ResponseField name="401" type="Unauthorized">
+  Invalid credentials or account not activated.
+</ResponseField>
+
+---
+
+## Activate Account
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://api.example.com/auth/activate-account?token=849201"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{}
+```
+</ResponseExample>
+
+<ParamField query="token" type="string" required>
+  6-digit activation code sent to the user's email after registration.
+</ParamField>
+
+### Response
+
+Returns HTTP 200 OK when the account is successfully activated. The user's account is now enabled and they can log in.
+
+### Errors
+
+<ResponseField name="400" type="Bad Request">
+  - Token is invalid
+  - Token has expired
+</ResponseField>

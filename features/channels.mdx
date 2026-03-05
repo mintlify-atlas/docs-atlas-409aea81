@@ -1,0 +1,337 @@
+---
+title: Channels
+description: Organize server communication with text, voice, and video channels
+---
+
+## Overview
+
+Channels are communication spaces within servers. Each channel belongs to a specific server and has a type (TEXT, VOICE, or VIDEO) that determines how members interact.
+
+## Channel Model
+
+The `Channel` entity represents a communication channel:
+
+```java
+@Entity
+@Table(name = "channels")
+public class Channel {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String name;
+
+    @Column(nullable = false)
+    private String type = "TEXT";
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "server_id", nullable = false)
+    private Server server;
+
+    @Column(name = "is_private")
+    private Boolean isPrivate = false;
+}
+```
+
+## Channel Types
+
+Channels support three types of communication:
+
+<CardGroup cols={3}>
+  <Card title="TEXT" icon="message">
+    Real-time text messaging with message history
+  </Card>
+  <Card title="VOICE" icon="microphone">
+    Voice communication for audio conversations
+  </Card>
+  <Card title="VIDEO" icon="video">
+    Video calls and screen sharing
+  </Card>
+</CardGroup>
+
+<Info>
+  The channel type is stored as a `String` with values: `"TEXT"`, `"VOICE"`, or `"VIDEO"`. The default type is `"TEXT"`.
+</Info>
+
+## Creating a Channel
+
+<Steps>
+  <Step title="Select parent server">
+    Channels must be created within an existing server.
+  </Step>
+  
+  <Step title="Provide channel details">
+    Specify the channel name, type (TEXT/VOICE/VIDEO), and privacy setting.
+  </Step>
+  
+  <Step title="Name formatting applied">
+    Channel names are automatically converted to lowercase with spaces replaced by hyphens (Discord-style).
+  </Step>
+  
+  <Step title="Channel added to server">
+    The channel is associated with the server and saved via cascade.
+  </Step>
+</Steps>
+
+### Channel Request
+
+```java
+public class ChannelRequest {
+    @NotBlank(message = "El nombre del canal es obligatorio")
+    private String name;
+
+    @Builder.Default
+    private String type = "TEXT";
+
+    private Boolean isPrivate;
+}
+```
+
+### API Endpoint
+
+```http
+POST /servers/{serverId}/channels
+Authorization: Bearer {jwt_token}
+Content-Type: application/json
+
+{
+  "name": "Tech Discussions",
+  "type": "TEXT",
+  "isPrivate": false
+}
+```
+
+### Channel Creation Implementation
+
+```java
+public ChannelResponse createChannel(Long serverId, ChannelRequest request) {
+    // 1. Find the parent server
+    Server server = serverRepository.findById(serverId)
+            .orElseThrow(() -> new RuntimeException("Server not found"));
+
+    // 2. Format channel name (lowercase with hyphens)
+    String formattedName = request.getName()
+            .trim()
+            .toLowerCase()
+            .replaceAll("\\s+", "-");
+
+    // 3. Create the channel entity
+    Channel newChannel = Channel.builder()
+            .name(formattedName)
+            .type(request.getType() != null ? request.getType() : "TEXT")
+            .isPrivate(request.getIsPrivate())
+            .server(server)
+            .build();
+
+    // 4. Add to server and save
+    server.getChannels().add(newChannel);
+    serverRepository.save(server);
+
+    // 5. Return response
+    return ChannelResponse.builder()
+            .id(newChannel.getId())
+            .name(newChannel.getName())
+            .type(newChannel.getType())
+            .build();
+}
+```
+
+<Note>
+  Channel names are automatically formatted: `"Tech Discussions"` becomes `"tech-discussions"`. This ensures consistency and URL-friendliness.
+</Note>
+
+## Channel Response
+
+The `ChannelResponse` DTO is returned when creating or listing channels:
+
+```java
+public class ChannelResponse {
+    private Long id;
+    private String name;
+    private String type;
+    private Boolean isPrivate;
+}
+```
+
+**Example Response:**
+
+```json
+{
+  "id": 5,
+  "name": "tech-discussions",
+  "type": "TEXT",
+  "isPrivate": false
+}
+```
+
+## Default Channel
+
+When a server is created, a default "general" text channel is automatically generated:
+
+```java
+public ServerResponse createServer(ServerRequest request, Authentication connectedUser) {
+    // ... create server ...
+
+    // Create default "general" channel
+    Channel defaultChannel = Channel.builder()
+            .name("general")
+            .type("TEXT")
+            .server(newServer)
+            .build();
+
+    newServer.setChannels(List.of(defaultChannel));
+
+    Server savedServer = serverRepository.save(newServer);
+    return mapToResponse(savedServer);
+}
+```
+
+## Private Channels
+
+Channels can be marked as private using the `isPrivate` flag:
+
+```java
+@Column(name = "is_private")
+private Boolean isPrivate = false;
+```
+
+<Tabs>
+  <Tab title="Public Channel">
+    ```json
+    {
+      "name": "general",
+      "type": "TEXT",
+      "isPrivate": false
+    }
+    ```
+    Visible to all server members.
+  </Tab>
+  <Tab title="Private Channel">
+    ```json
+    {
+      "name": "admin-only",
+      "type": "TEXT",
+      "isPrivate": true
+    }
+    ```
+    Restricted visibility (implementation pending).
+  </Tab>
+</Tabs>
+
+<Warning>
+  The `isPrivate` field is currently stored but not enforced. Access control logic for private channels needs to be implemented.
+</Warning>
+
+## Channel-Server Relationship
+
+Channels have a many-to-one relationship with servers:
+
+```java
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = "server_id", nullable = false)
+private Server server;
+```
+
+<Info>
+  Every channel must belong to a server. The relationship uses lazy fetching to optimize performance when loading channel lists.
+</Info>
+
+## Listing Server Channels
+
+Channels are included in the server response when fetching server details:
+
+```http
+GET /servers/{serverId}
+Authorization: Bearer {jwt_token}
+```
+
+**Response includes channels:**
+
+```json
+{
+  "id": 1,
+  "name": "My Server",
+  "imageUrl": "https://example.com/server.png",
+  "channels": [
+    {
+      "id": 1,
+      "name": "general",
+      "type": "TEXT",
+      "isPrivate": false
+    },
+    {
+      "id": 2,
+      "name": "voice-lounge",
+      "type": "VOICE",
+      "isPrivate": false
+    },
+    {
+      "id": 3,
+      "name": "video-calls",
+      "type": "VIDEO",
+      "isPrivate": false
+    }
+  ],
+  "members": [...]
+}
+```
+
+## Channel Mapping
+
+The server service maps channel entities to DTOs:
+
+```java
+private ServerResponse mapToResponse(Server server) {
+    List<ChannelResponse> channelResponses = server.getChannels() != null
+            ? server.getChannels().stream()
+                .map(channel -> ChannelResponse.builder()
+                        .id(channel.getId())
+                        .name(channel.getName())
+                        .type(channel.getType())
+                        .build())
+                .collect(Collectors.toList())
+            : List.of();
+
+    return ServerResponse.builder()
+            .id(server.getId())
+            .name(server.getName())
+            .imageUrl(server.getImageUrl())
+            .channels(channelResponses)
+            .members(memberResponses)
+            .build();
+}
+```
+
+## Cascade Deletion
+
+Channels are automatically deleted when their parent server is deleted:
+
+```java
+@OneToMany(mappedBy = "server", cascade = CascadeType.ALL, orphanRemoval = true)
+private List<Channel> channels;
+```
+
+<Warning>
+  Deleting a server will permanently delete all associated channels and their messages. This action cannot be undone.
+</Warning>
+
+## Message Integration
+
+Text channels are linked to messages via the `channelId` field:
+
+```java
+// In Message.java
+private Long channelId; // Links message to a channel
+```
+
+See the [Messaging](/features/messaging) documentation for details on sending and retrieving channel messages.
+
+## Implementation Reference
+
+Key files in the channel system:
+
+- `Channel.java` - Entity model at [server/Channel.java:16-49](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/server/Channel.java)
+- `ChannelRequest.java` - Create DTO at [server/ChannelRequest.java:11-19](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/server/ChannelRequest.java)
+- `ChannelResponse.java` - Response DTO at [server/ChannelResponse.java:10-14](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/server/ChannelResponse.java)
+- `ServerService.java` - Channel creation logic at [server/ServerService.java:197-226](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/server/ServerService.java)

@@ -1,0 +1,393 @@
+---
+title: Messaging
+description: Real-time messaging system using WebSockets with MongoDB persistence
+---
+
+## Overview
+
+Null's messaging system provides real-time communication through WebSockets using STOMP protocol over SockJS. Messages are persisted to MongoDB and distributed via Kafka for scalability.
+
+## Message Model
+
+Messages are stored in MongoDB as documents:
+
+```java
+@Document(collection = "messages")
+@CompoundIndexes({
+    @CompoundIndex(name = "conv_time_idx", def = "{'conversationId': 1, 'timestamp': 1}"),
+    @CompoundIndex(name = "channel_time_idx", def = "{'channelId': 1, 'timestamp': 1}")
+})
+public class Message {
+    @Id
+    private String id;
+    
+    private String content;
+    private Integer sendId;            // Sender's user ID
+    private String senderNickname;     // Cached sender nickname
+    
+    private Long conversationId;       // For direct messages
+    private Long channelId;            // For server channel messages
+    
+    private LocalDateTime timestamp;
+}
+```
+
+<Info>
+  Messages support two contexts: **Direct Messages** (using `conversationId`) and **Channel Messages** (using `channelId`). A message must have one or the other, but not both.
+</Info>
+
+## Message Types
+
+<Tabs>
+  <Tab title="Channel Message">
+    Messages sent to a server channel:
+    ```json
+    {
+      "content": "Hello everyone!",
+      "sendId": 5,
+      "channelId": 12,
+      "conversationId": null
+    }
+    ```
+  </Tab>
+  <Tab title="Direct Message">
+    Private messages between two users:
+    ```json
+    {
+      "content": "Hey, how are you?",
+      "sendId": 5,
+      "conversationId": 3,
+      "channelId": null
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## WebSocket Connection
+
+### Backend Configuration
+
+The WebSocket server is configured with JWT authentication:
+
+```java
+@Configuration
+@EnableWebSocketMessageBroker
+public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+
+    @Override
+    public void registerStompEndpoints(StompEndpointRegistry registry) {
+        registry.addEndpoint("/ws")
+                .setAllowedOriginPatterns("*");
+    }
+
+    @Override
+    public void configureMessageBroker(MessageBrokerRegistry registry) {
+        registry.enableSimpleBroker("/topic");
+        registry.setApplicationDestinationPrefixes("/app");
+    }
+}
+```
+
+<Info>
+  - **Endpoint:** `/ws` - SockJS/STOMP connection point
+  - **Broker:** `/topic` - Subscription prefix for receiving messages
+  - **App Prefix:** `/app` - Prefix for sending messages to the server
+</Info>
+
+### JWT Authentication for WebSockets
+
+The WebSocket interceptor validates JWT tokens on connection:
+
+```java
+@Override
+public void configureClientInboundChannel(ChannelRegistration registration) {
+    registration.interceptors(new ChannelInterceptor() {
+        @Override
+        public Message<?> preSend(Message<?> message, MessageChannel channel) {
+            StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+
+            if (StompCommand.CONNECT.equals(accessor.getCommand())) {
+                String authHeader = accessor.getFirstNativeHeader("Authorization");
+
+                if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                    String token = authHeader.substring(7);
+
+                    try {
+                        String userEmail = jwtService.extractUsername(token);
+
+                        if (userEmail != null) {
+                            UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
+
+                            if (jwtService.isTokenValid(token, userDetails)) {
+                                UsernamePasswordAuthenticationToken authentication =
+                                    new UsernamePasswordAuthenticationToken(
+                                        userDetails,
+                                        null,
+                                        userDetails.getAuthorities()
+                                    );
+
+                                accessor.setUser(authentication);
+                                System.out.println("✅ WS Autenticado: " + userEmail);
+                            }
+                        }
+                    } catch (Exception e) {
+                        System.err.println("❌ Token JWT inválido: " + e.getMessage());
+                    }
+                }
+            }
+            return message;
+        }
+    });
+}
+```
+
+<Warning>
+  The JWT token must be included in the `Authorization` header when establishing the WebSocket connection. Without a valid token, messages cannot be sent or received.
+</Warning>
+
+### Frontend Connection (Angular)
+
+The Angular frontend connects using RxStomp:
+
+```typescript
+import { RxStomp, RxStompConfig } from '@stomp/rx-stomp';
+
+@Injectable({
+  providedIn: 'root',
+})
+export class Websocket {
+  public rxStomp: RxStomp = new RxStomp();
+
+  public conectar() {
+    if (this.rxStomp.active) {
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      console.warn('⚠️ No token available for WebSocket connection');
+      return;
+    }
+
+    const rxStompConfig: RxStompConfig = {
+      brokerURL: 'ws://localhost:8088/api/v1/ws',
+      connectHeaders: {
+        Authorization: `Bearer ${token}`
+      },
+      heartbeatIncoming: 0,
+      heartbeatOutgoing: 20000,
+      reconnectDelay: 5000,
+      debug: (msg: string): void => {
+        // console.log(new Date(), msg);
+      },
+    };
+
+    this.rxStomp.configure(rxStompConfig);
+    this.rxStomp.activate();
+    console.log('🔌 WebSocket activated with Token!');
+  }
+}
+```
+
+<Steps>
+  <Step title="Retrieve JWT token">
+    Extract the authentication token from localStorage.
+  </Step>
+  <Step title="Configure RxStomp">
+    Set the WebSocket URL and include the JWT in connection headers.
+  </Step>
+  <Step title="Activate connection">
+    Establish the WebSocket connection with authentication.
+  </Step>
+</Steps>
+
+## Sending Messages
+
+### API Endpoint
+
+```http
+POST /messages
+Authorization: Bearer {jwt_token}
+Content-Type: application/json
+
+{
+  "content": "Hello from the channel!",
+  "sendId": 5,
+  "channelId": 12
+}
+```
+
+### Message Service Implementation
+
+```java
+public Message saveMessage(Message message) {
+    // 1. Validate destination (channel or conversation)
+    if (message.getConversationId() != null) {
+        if(!conversationRepository.existsById(message.getConversationId())){
+            throw new RuntimeException("Error: Conversation does not exist.");
+        }
+    } else if (message.getChannelId() == null) {
+        throw new IllegalArgumentException(
+            "Message must have a channelId or conversationId."
+        );
+    }
+
+    // 2. Enrich with sender nickname
+    String nickname = userRepository.findById(message.getSendId())
+            .map(User::getNickName)
+            .orElse("User " + message.getSendId());
+
+    // 3. Set metadata
+    message.setSenderNickname(nickname);
+    message.setTimestamp(LocalDateTime.now());
+
+    // 4. Persist to MongoDB
+    Message savedMessage = messageRepository.save(message);
+
+    // 5. Broadcast via Kafka
+    messageProducer.sendMessage(savedMessage);
+
+    log.info("Message from {} sent successfully", nickname);
+
+    return savedMessage;
+}
+```
+
+<Note>
+  The `senderNickname` is automatically enriched from the User entity, so clients don't need to include it in the request.
+</Note>
+
+## Receiving Messages
+
+Clients subscribe to topics to receive real-time messages:
+
+<Tabs>
+  <Tab title="Channel Messages">
+    Subscribe to a specific channel:
+    ```typescript
+    this.websocket.rxStomp
+      .watch(`/topic/channel/${channelId}`)
+      .subscribe((stompMessage) => {
+        const message = JSON.parse(stompMessage.body);
+        console.log('New message:', message);
+      });
+    ```
+  </Tab>
+  <Tab title="Direct Messages">
+    Subscribe to a conversation:
+    ```typescript
+    this.websocket.rxStomp
+      .watch(`/topic/conversation/${conversationId}`)
+      .subscribe((stompMessage) => {
+        const message = JSON.parse(stompMessage.body);
+        console.log('New DM:', message);
+      });
+    ```
+  </Tab>
+</Tabs>
+
+## Message History
+
+### Channel Message History
+
+Retrieve all messages for a specific channel:
+
+```http
+GET /messages/channel/{channelId}
+Authorization: Bearer {jwt_token}
+```
+
+```java
+public List<Message> findChannelMessages(Long channelId) {
+    return messageRepository.findByChannelIdOrderByTimestampAsc(channelId);
+}
+```
+
+### Direct Message History
+
+Retrieve conversation history:
+
+```http
+GET /messages/chat/{conversationId}
+Authorization: Bearer {jwt_token}
+```
+
+```java
+public List<Message> findChatMessages(Long conversationId) {
+    return messageRepository.findByConversationIdOrderByTimestampAsc(conversationId);
+}
+```
+
+## Kafka Integration
+
+Messages are broadcast via Kafka for horizontal scalability:
+
+```java
+@Service
+@RequiredArgsConstructor
+public class MessageService {
+    private final MessageProducer messageProducer;
+
+    public Message saveMessage(Message message) {
+        // ... save message ...
+        
+        // Broadcast to Kafka
+        messageProducer.sendMessage(savedMessage);
+        
+        return savedMessage;
+    }
+}
+```
+
+<Info>
+  Kafka enables the system to handle high message throughput and allows multiple backend instances to process messages in parallel.
+</Info>
+
+## MongoDB Indexing
+
+Compound indexes optimize message queries:
+
+```java
+@CompoundIndexes({
+    @CompoundIndex(name = "conv_time_idx", def = "{'conversationId': 1, 'timestamp': 1}"),
+    @CompoundIndex(name = "channel_time_idx", def = "{'channelId': 1, 'timestamp': 1}")
+})
+```
+
+<Note>
+  These indexes ensure fast retrieval of message history sorted by timestamp for both channels and conversations.
+</Note>
+
+## Message Flow Diagram
+
+<Steps>
+  <Step title="User sends message">
+    Client POSTs message to `/messages` endpoint with JWT authentication.
+  </Step>
+  <Step title="Server validates and enriches">
+    Backend validates destination, adds sender nickname and timestamp.
+  </Step>
+  <Step title="Persist to MongoDB">
+    Message is saved to MongoDB with appropriate indexes.
+  </Step>
+  <Step title="Broadcast via Kafka">
+    Message is published to Kafka topic for distribution.
+  </Step>
+  <Step title="Kafka consumer forwards to WebSocket">
+    Consumer receives message and broadcasts to subscribed WebSocket clients.
+  </Step>
+  <Step title="Clients receive message">
+    All subscribed users receive the message in real-time via their WebSocket connection.
+  </Step>
+</Steps>
+
+## Implementation Reference
+
+Key files in the messaging system:
+
+- `Message.java` - MongoDB document model at [message/Message.java:16-37](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/message/Message.java)
+- `MessageController.java` - REST endpoints at [message/MessageController.java:12-33](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/message/MessageController.java)
+- `MessageService.java` - Message logic at [message/MessageService.java:17-69](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/message/MessageService.java)
+- `WebSocketConfig.java` - WebSocket configuration at [websocket/WebSocketConfig.java:24-103](/home/daytona/workspace/source/null_services_backend/src/main/java/com/example/demo/websocket/WebSocketConfig.java)
+- `websocket.ts` - Angular WebSocket service at [websocket/websocket.ts:7-41](/home/daytona/workspace/source/null_services_frontend/src/app/services/api/websocket/websocket.ts)

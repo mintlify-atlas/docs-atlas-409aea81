@@ -1,0 +1,195 @@
+---
+title: Messages
+description: Endpoints for sending and retrieving messages in direct chats and server channels
+---
+
+The Messages API handles message operations for both direct conversations and server channels.
+
+## Send Message
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.example.com/messages \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "Hello, how are you?",
+    "sendId": 123,
+    "senderNickname": "johndoe",
+    "conversationId": 456,
+    "timestamp": "2026-03-05T14:30:00"
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{
+  "id": "65f8a9b7c3d2e1f4a5b6c7d8",
+  "content": "Hello, how are you?",
+  "sendId": 123,
+  "senderNickname": "johndoe",
+  "conversationId": 456,
+  "channelId": null,
+  "timestamp": "2026-03-05T14:30:00"
+}
+```
+</ResponseExample>
+
+Sends a message to either a direct conversation or a server channel.
+
+<ParamField path="content" type="string" required>
+  Message text content.
+</ParamField>
+
+<ParamField path="sendId" type="integer" required>
+  ID of the user sending the message.
+</ParamField>
+
+<ParamField path="senderNickname" type="string" required>
+  Display name of the sender.
+</ParamField>
+
+<ParamField path="conversationId" type="integer">
+  ID of the direct conversation. Include this for direct messages. Either conversationId or channelId should be provided, not both.
+</ParamField>
+
+<ParamField path="channelId" type="integer">
+  ID of the server channel. Include this for channel messages. Either conversationId or channelId should be provided, not both.
+</ParamField>
+
+<ParamField path="timestamp" type="string" required>
+  Message timestamp in ISO 8601 format.
+</ParamField>
+
+### Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the message (MongoDB ObjectId).
+</ResponseField>
+
+<ResponseField name="content" type="string">
+  Message text content.
+</ResponseField>
+
+<ResponseField name="sendId" type="integer">
+  ID of the sender.
+</ResponseField>
+
+<ResponseField name="senderNickname" type="string">
+  Display name of the sender.
+</ResponseField>
+
+<ResponseField name="conversationId" type="integer">
+  ID of the direct conversation (null for channel messages).
+</ResponseField>
+
+<ResponseField name="channelId" type="integer">
+  ID of the server channel (null for direct messages).
+</ResponseField>
+
+<ResponseField name="timestamp" type="string">
+  Message timestamp in ISO 8601 format.
+</ResponseField>
+
+---
+
+## Get Direct Chat History
+
+<RequestExample>
+```bash cURL
+curl -X GET https://api.example.com/messages/chat/456 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+[
+  {
+    "id": "65f8a9b7c3d2e1f4a5b6c7d8",
+    "content": "Hello, how are you?",
+    "sendId": 123,
+    "senderNickname": "johndoe",
+    "conversationId": 456,
+    "channelId": null,
+    "timestamp": "2026-03-05T14:30:00"
+  },
+  {
+    "id": "65f8a9b7c3d2e1f4a5b6c7d9",
+    "content": "I'm doing great, thanks!",
+    "sendId": 789,
+    "senderNickname": "janedoe",
+    "conversationId": 456,
+    "channelId": null,
+    "timestamp": "2026-03-05T14:31:00"
+  }
+]
+```
+</ResponseExample>
+
+Retrieves the message history for a direct conversation.
+
+<ParamField path="conversationId" type="integer" required>
+  The ID of the conversation to retrieve messages from.
+</ParamField>
+
+### Response
+
+Returns an array of message objects sorted by timestamp, with the same structure as the Send Message response.
+
+---
+
+## Get Channel History
+
+<RequestExample>
+```bash cURL
+curl -X GET https://api.example.com/messages/channel/1 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+[
+  {
+    "id": "65f8a9b7c3d2e1f4a5b6c7da",
+    "content": "Welcome to the general channel!",
+    "sendId": 123,
+    "senderNickname": "johndoe",
+    "conversationId": null,
+    "channelId": 1,
+    "timestamp": "2026-03-05T10:00:00"
+  },
+  {
+    "id": "65f8a9b7c3d2e1f4a5b6c7db",
+    "content": "Thanks! Happy to be here.",
+    "sendId": 789,
+    "senderNickname": "janedoe",
+    "conversationId": null,
+    "channelId": 1,
+    "timestamp": "2026-03-05T10:05:00"
+  }
+]
+```
+</ResponseExample>
+
+Retrieves the message history for a server channel.
+
+<ParamField path="channelId" type="integer" required>
+  The ID of the channel to retrieve messages from.
+</ParamField>
+
+### Response
+
+Returns an array of message objects sorted by timestamp, with the same structure as the Send Message response.
+
+### Errors
+
+<ResponseField name="404" type="Not Found">
+  Channel not found.
+</ResponseField>
+
+<ResponseField name="403" type="Forbidden">
+  User does not have access to this channel.
+</ResponseField>
