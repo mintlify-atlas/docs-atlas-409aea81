@@ -65,6 +65,7 @@
               "api/authentication",
               "api/servers",
               "api/messages",
+              "api/conversations",
               "api/friends",
               "api/users"
             ]

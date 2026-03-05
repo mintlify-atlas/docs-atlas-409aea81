@@ -5,9 +5,7 @@ description: Understanding Null's system design and components
 
 ## System Overview
 
-Null is built with a **microservices-inspired monorepo architecture** that separates concerns while maintaining development simplicity. The system uses event-driven patterns to enable asynchronous processing and real-time communication.
-
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                        Client Layer                          │
 │  ┌──────────────────────────────────────────────────────┐   │
@@ -76,7 +74,7 @@ Null is built with a **microservices-inspired monorepo architecture** that separ
 
 The project is organized as a monorepo with clear separation of concerns:
 
-```
+```text
 null/
 ├── docker-compose.yml              # Infrastructure orchestration
 ├── null_services_backend/          # Spring Boot API
@@ -188,7 +186,7 @@ Null uses **Apache Kafka** to decouple message processing and enable horizontal 
 
 #### Message Flow
 
-```
+```text
 1. User sends message via WebSocket
    │
    ▼
@@ -337,7 +335,7 @@ All services are orchestrated with Docker Compose for consistent development env
 
 Let's trace how account activation emails are sent:
 
-```
+```text
 1. POST /api/v1/auth/register
    │  AuthenticationController receives request
    │

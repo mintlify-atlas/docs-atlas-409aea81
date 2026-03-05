@@ -1,0 +1,142 @@
+---
+title: Conversations
+description: Endpoints for managing direct message conversations between users
+---
+
+The Conversations API handles direct message (DM) conversations between users. Each conversation is a private channel for two users to communicate.
+
+## Create or Get Conversation
+
+<RequestExample>
+```bash cURL
+curl -X POST https://api.example.com/conversations/456 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+{
+  "id": 123,
+  "otherUserName": "johndoe"
+}
+```
+</ResponseExample>
+
+Creates a new conversation with a target user or retrieves an existing conversation if one already exists between the two users.
+
+### Path Parameters
+
+<ParamField path="targetUserId" type="integer" required>
+  The ID of the user to start a conversation with.
+</ParamField>
+
+### Response
+
+<ResponseField name="id" type="integer">
+  Unique identifier for the conversation.
+</ResponseField>
+
+<ResponseField name="otherUserName" type="string">
+  Username of the other participant in the conversation.
+</ResponseField>
+
+### Error Responses
+
+<ResponseField name="401" type="error">
+  Unauthorized - Invalid or missing JWT token.
+</ResponseField>
+
+<ResponseField name="404" type="error">
+  Not Found - Target user does not exist.
+</ResponseField>
+
+---
+
+## Get User Conversations
+
+<RequestExample>
+```bash cURL
+curl -X GET https://api.example.com/conversations \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 OK
+[
+  {
+    "id": 123,
+    "otherUserName": "johndoe"
+  },
+  {
+    "id": 124,
+    "otherUserName": "janedoe"
+  }
+]
+```
+</ResponseExample>
+
+Retrieves all conversations for the authenticated user.
+
+### Response
+
+Returns an array of conversation objects.
+
+<ResponseField name="id" type="integer">
+  Unique identifier for the conversation.
+</ResponseField>
+
+<ResponseField name="otherUserName" type="string">
+  Username of the other participant in the conversation.
+</ResponseField>
+
+### Error Responses
+
+<ResponseField name="401" type="error">
+  Unauthorized - Invalid or missing JWT token.
+</ResponseField>
+
+---
+
+## Usage Example
+
+### Starting a Direct Message
+
+<Steps>
+  <Step title="Create or get conversation">
+    First, create or retrieve the conversation with the target user:
+    
+    ```bash
+    curl -X POST https://api.example.com/conversations/456 \
+      -H "Authorization: Bearer YOUR_JWT_TOKEN"
+    ```
+  </Step>
+  
+  <Step title="Send messages">
+    Use the returned conversation ID to send messages via the Messages API:
+    
+    ```bash
+    curl -X POST https://api.example.com/messages \
+      -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "conversationId": 123,
+        "content": "Hello!"
+      }'
+    ```
+  </Step>
+  
+  <Step title="Retrieve message history">
+    Fetch the conversation history:
+    
+    ```bash
+    curl -X GET https://api.example.com/messages/chat/123 \
+      -H "Authorization: Bearer YOUR_JWT_TOKEN"
+    ```
+  </Step>
+</Steps>
+
+<Note>
+Conversations are automatically created when two users first message each other. The system prevents duplicate conversations between the same pair of users.
+</Note>
